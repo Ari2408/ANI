@@ -1,0 +1,181 @@
+/* ==========================================================================
+   Caregiver & Neurologist Dashboard Styling
+   ========================================================================== */
+
+.caregiver-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--primary-dark);
+  color: #FFFFFF;
+  padding: 16px;
+  border-radius: 18px;
+  margin-bottom: 16px;
+}
+
+.patient-info-box h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.patient-info-box p {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.risk-badge.low {
+  background: var(--success);
+}
+
+.risk-badge.moderate {
+  background: var(--warning);
+}
+
+.risk-badge.high {
+  background: var(--danger);
+}
+
+/* Metric KPI Cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.kpi-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+.kpi-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--primary-dark);
+  margin: 4px 0;
+}
+
+.kpi-subtext {
+  font-size: 12px;
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Chart Canvas Container */
+.chart-container {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--box-shadow);
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+canvas#chiTrendChart {
+  width: 100% !important;
+  height: 180px !important;
+}
+
+/* Activity Log Table */
+.activity-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.log-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #F9FAF8;
+  border-radius: 12px;
+  border-left: 4px solid var(--primary);
+  font-size: 13px;
+}
+
+.log-item.alert {
+  border-left-color: var(--danger);
+  background: #FFF5F5;
+}
+
+.log-item .log-time {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Emergency Alert Section */
+.emergency-box {
+  background: #FFF0F0;
+  border: 2px solid var(--danger);
+  border-radius: 18px;
+  padding: 16px;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.emergency-box h3 {
+  color: var(--danger);
+  margin-bottom: 6px;
+}
+
+.btn-sos {
+  background: var(--danger);
+  color: #FFFFFF;
+  font-size: 18px;
+  font-weight: 800;
+  padding: 14px;
+  width: 100%;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(238, 82, 83, 0.4);
+}
+
+/* Print/Clinical Report View */
+@media print {
+  body {
+    background: #FFFFFF;
+    color: #000000;
+  }
+  #app-shell {
+    max-width: 100%;
+    height: auto;
+    box-shadow: none;
+  }
+  .bottom-nav, .voice-fab, .header-actions {
+    display: none !important;
+  }
+}

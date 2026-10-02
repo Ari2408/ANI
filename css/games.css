@@ -1,0 +1,311 @@
+/* ==========================================================================
+   Cognitive Games & Interactive Activity Styling
+   ========================================================================== */
+
+/* Cognitive Games Selection Hub */
+.games-hub-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.game-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #FFFFFF;
+  border: 2px solid var(--border-color);
+  border-radius: 20px;
+  padding: 16px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  box-shadow: var(--box-shadow);
+}
+
+.game-card:active {
+  transform: scale(0.97);
+  border-color: var(--primary);
+}
+
+.game-icon-box {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: var(--bg-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.game-info h3 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin-bottom: 4px;
+}
+
+.game-info p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.game-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #E8F5E9;
+  color: var(--primary);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+/* Active Game Play Container */
+.game-play-area {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.game-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #E8EFE9;
+  padding: 12px 16px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  font-weight: 700;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+}
+
+/* 1. Visual Memory Card Grid */
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.memory-grid.grid-6 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.memory-grid.grid-8 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.memory-card {
+  aspect-ratio: 1;
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.memory-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.memory-card.flipped .memory-card-inner,
+.memory-card.matched .memory-card-inner {
+  transform: rotateY(180deg);
+}
+
+.memory-card-front, .memory-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 2px solid var(--border-color);
+}
+
+.memory-card-front {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: #FFFFFF;
+  font-size: 36px;
+}
+
+.memory-card-back {
+  background: #FFFFFF;
+  transform: rotateY(180deg);
+  color: var(--primary-dark);
+}
+
+.memory-card-back img {
+  width: 80%;
+  height: 60%;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.memory-card-back span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.memory-card.matched .memory-card-back {
+  border-color: var(--success);
+  background: #F0FFF4;
+}
+
+/* 2. Daily Routine Recall Sequencing */
+.routine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.routine-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FFFFFF;
+  border: 2px solid var(--border-color);
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: grab;
+  touch-action: none;
+}
+
+.routine-item.selected {
+  border-color: var(--secondary);
+  background: #FFF8F0;
+}
+
+.routine-item .item-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+/* 3. Loom Pattern Sorting */
+.pattern-target-box {
+  background: #FFF8F0;
+  border: 2px dashed var(--secondary);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.pattern-target-box h4 {
+  color: var(--secondary);
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.pattern-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.pattern-option-card {
+  background: #FFFFFF;
+  border: 2px solid var(--border-color);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.pattern-option-card svg {
+  width: 50px;
+  height: 50px;
+}
+
+/* 4. Mindful Nature Soundscape */
+.nature-room {
+  text-align: center;
+  padding: 20px 10px;
+}
+
+.nature-image-holder {
+  width: 100%;
+  height: 200px;
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: var(--box-shadow);
+}
+
+.nature-image-holder img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.breathing-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--primary-light) 0%, var(--primary) 100%);
+  color: #FFFFFF;
+  margin: 16px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  animation: breathe 8s infinite ease-in-out;
+  box-shadow: 0 0 30px rgba(45, 122, 99, 0.4);
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.35); opacity: 1; }
+}
+
+.sound-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sound-btn {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: #FFFFFF;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sound-btn.active {
+  background: var(--primary);
+  color: #FFFFFF;
+  border-color: var(--primary);
+}

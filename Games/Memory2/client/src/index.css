@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@layer base {
+  html, body, #root {
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Elder Accessibility Helpers */
+.elder-touch-target {
+  min-height: 68px;
+  min-width: 68px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.elder-text-lg {
+  font-size: 1.5rem; /* 24px */
+  line-height: 2rem;
+}
+
+.elder-text-xl {
+  font-size: 1.875rem; /* 30px */
+  line-height: 2.35rem;
+}
+
+.elder-text-2xl {
+  font-size: 2.25rem; /* 36px */
+  line-height: 2.75rem;
+}
+
+/* Pulse countdown animation */
+@keyframes countdown-ring {
+  0% { transform: rotate(-90deg) scale(1); }
+  50% { transform: rotate(-90deg) scale(1.02); }
+  100% { transform: rotate(-90deg) scale(1); }
+}
+
+.animate-gentle-pulse {
+  animation: gentle-pulse 2s infinite ease-in-out;
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+/* Print styles for caregiver clinical report */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}

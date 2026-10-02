@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B4D3E">
+  <meta name="description" content="Purb Chetana - AI Cognitive Gaming & Memory Assistance Platform for Elderly Dementia Patients in North Eastern Region and Tamil Nadu.">
+  <title>Purb Chetana (পূৰ্ব চেতনা / பூர்ப் சேதனா) - Elderly Cognitive Assistant</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Comic+Relief:wght@400;700&family=Noto+Serif+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/mobile.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/caregiver.css">
+</head>
+<body>
+
+  <div id="app-shell">
+    
+    <!-- Top Mobile Application Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <img src="assets/images/app_logo.png" alt="Purb Chetana Logo" style="width: 42px; height: 42px; border-radius: 12px; object-fit: cover; border: 2px solid var(--accent);"/>
+        <div class="app-title-box">
+          <h1 data-i18n="appName">পূৰ্ব চেতনা</h1>
+          <span data-i18n="tagline">Cognitive & Memory Assistant</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- High Contrast Mode Toggle -->
+        <button class="header-btn" onclick="appRouter.toggleContrast()" title="High Contrast Mode">
+          👁️
+        </button>
+        <!-- Language Selector -->
+        <button class="header-btn" id="langSelectBtn" onclick="appRouter.openLanguageModal()" title="Select Language">
+          🇮🇳
+        </button>
+      </div>
+    </header>
+
+    <!-- Offline Synchronization Status Bar -->
+    <div class="sync-bar" id="syncBar">
+      <div>
+        <span class="sync-indicator"></span>
+        <span id="syncText">Online Mode • Data Synced</span>
+      </div>
+      <span style="font-size: 11px; opacity: 0.8;">PWA Offline Ready</span>
+    </div>
+
+    <!-- Main Dynamic View Area -->
+    <main class="view-container">
+      <div id="viewHome" class="app-view active"></div>
+      <div id="viewGames" class="app-view"></div>
+      <div id="viewSchedule" class="app-view"></div>
+      <div id="viewMemoryLane" class="app-view"></div>
+      <div id="viewCaregiver" class="app-view"></div>
+    </main>
+
+    <!-- Floating Voice Assistant Button -->
+    <button class="voice-fab" id="voiceFab" onclick="speechEngine.toggleListen()" title="Voice Assistant">
+      🎙️
+    </button>
+
+    <!-- Bottom Mobile Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-tab active" data-tab="home" onclick="appRouter.navigate('home')">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label" data-i18n="home">முகப்பு</span>
+      </button>
+      
+      <button class="nav-tab" data-tab="games" onclick="appRouter.navigate('games')">
+        <span class="tab-icon">🧩</span>
+        <span class="tab-label" data-i18n="games">விளையாட்டு</span>
+      </button>
+
+      <button class="nav-tab" data-tab="schedule" onclick="appRouter.navigate('schedule')">
+        <span class="tab-icon">⏰</span>
+        <span class="tab-label" data-i18n="schedule">அட்டவணை</span>
+      </button>
+
+      <button class="nav-tab" data-tab="memoryLane" onclick="appRouter.navigate('memoryLane')">
+        <span class="tab-icon">📸</span>
+        <span class="tab-label" data-i18n="memoryLane">நினைவுகள்</span>
+      </button>
+
+      <button class="nav-tab" data-tab="caregiver" onclick="appRouter.navigate('caregiver')">
+        <span class="tab-icon">👨‍⚕️</span>
+        <span class="tab-label" data-i18n="caregiver">பராமரிப்பாளர்</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- Language Selection Modal -->
+  <div class="modal-overlay" id="langModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Select Language / மொழி</h3>
+        <button class="close-btn" onclick="appRouter.closeLanguageModal()">&times;</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="btn-elder btn-outline" onclick="appRouter.selectLang('ta')" style="justify-content: flex-start;">
+          🇮🇳 தமிழ் (Tamil)
+        </button>
+        <button class="btn-elder btn-outline" onclick="appRouter.selectLang('as')" style="justify-content: flex-start;">
+          🌾 অসমীয়া (Assamese)
+        </button>
+        <button class="btn-elder btn-outline" onclick="appRouter.selectLang('bn')" style="justify-content: flex-start;">
+          🌺 বাংলা (Bengali)
+        </button>
+        <button class="btn-elder btn-outline" onclick="appRouter.selectLang('mni')" style="justify-content: flex-start;">
+          🌊 মৈতৈলোন্ (Manipuri)
+        </button>
+        <button class="btn-elder btn-outline" onclick="appRouter.selectLang('lus')" style="justify-content: flex-start;">
+          ⛰️ Mizo (Mizo ṭawng)
+        </button>
+        <button class="btn-elder btn-outline" onclick="appRouter.selectLang('kha')" style="justify-content: flex-start;">
+          🌧️ Khasi (Ka Ktien)
+        </button>
+        <button class="btn-elder btn-outline" onclick="appRouter.selectLang('nag')" style="justify-content: flex-start;">
+          🌄 Nagamese / हिंदी
+        </button>
+        <button class="btn-elder btn-outline" onclick="appRouter.selectLang('en')" style="justify-content: flex-start;">
+          🇬🇧 English
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/i18n.js"></script>
+  <script src="js/speech.js"></script>
+  <script src="js/aiEngine.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/audioSynth.js"></script>
+
+  <script src="js/games/visualMemory.js"></script>
+  <script src="js/games/routineRecall.js"></script>
+  <script src="js/games/patternSorting.js"></script>
+  <script src="js/games/wordAssociation.js"></script>
+  <script src="js/games/mindfulNature.js"></script>
+
+  <script src="js/components/newsFeed.js"></script>
+  <script src="js/components/patientView.js"></script>
+  <script src="js/components/scheduleReminders.js"></script>
+  <script src="js/components/memoryLane.js"></script>
+  <script src="js/components/caregiverDashboard.js"></script>
+
+  <script src="js/app.js"></script>
+
+</body>
+</html>
