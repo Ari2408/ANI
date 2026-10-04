@@ -8,6 +8,7 @@ import 'services/notification_service.dart';
 import 'services/memory_lane_service.dart';
 import 'services/webrtc_service.dart';
 import 'services/news_service.dart';
+import 'services/elder_location_service.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/auth_onboarding_screen.dart';
 import 'screens/animated_splash_intro_screen.dart';
@@ -41,6 +42,7 @@ class PurbChetanaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MemoryLaneService()),
         ChangeNotifierProvider(create: (_) => WebRTCService()),
         ChangeNotifierProvider(create: (_) => NewsService()),
+        ChangeNotifierProvider(create: (_) => ElderLocationService()),
       ],
       child: Consumer<I18nService>(
         builder: (context, i18n, child) {
