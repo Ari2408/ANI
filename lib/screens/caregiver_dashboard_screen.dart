@@ -10,6 +10,8 @@ import '../widgets/elder_card.dart';
 import '../widgets/elder_button.dart';
 import '../widgets/elder_location_map_card.dart';
 import '../services/memory_lane_service.dart';
+import '../services/elder_location_service.dart';
+import 'elder_location_screen.dart';
 import 'memory_lane_screen.dart';
 
 class CaregiverDashboardScreen extends StatefulWidget {
@@ -20,6 +22,17 @@ class CaregiverDashboardScreen extends StatefulWidget {
 }
 
 class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
+ @override
+ void initState() {
+ super.initState();
+ WidgetsBinding.instance.addPostFrameCallback((_) {
+ final auth = Provider.of<AuthService>(context, listen: false);
+ final mappedId = auth.currentUser?.mappedElderId ?? 'NER-9431';
+ final locSvc = Provider.of<ElderLocationService>(context, listen: false);
+ locSvc.listenToElderLocation(mappedId);
+ });
+ }
+
  void _triggerSOS() {
  final i18n = Provider.of<I18nService>(context, listen: false);
  showDialog(
@@ -77,6 +90,8 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
  onRefresh: () async {
  await auth.loadState();
  await schedule.loadSchedules(elderId: mappedElderId);
+ final locSvc = Provider.of<ElderLocationService>(context, listen: false);
+ await locSvc.refreshLocation(mappedElderId);
  setState(() {});
  },
  child: ListView(
@@ -200,6 +215,8 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
  onRefreshLocation: () async {
  await auth.loadState();
  await auth.fetchElderProfileCloud(mappedElderId);
+ final locSvc = Provider.of<ElderLocationService>(context, listen: false);
+ await locSvc.refreshLocation(mappedElderId);
  setState(() {});
  },
  ),

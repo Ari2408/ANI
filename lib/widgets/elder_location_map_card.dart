@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/elder_location_service.dart';
+import '../screens/elder_location_screen.dart';
 
 class ElderLocationMapCard extends StatefulWidget {
  final String elderName;
@@ -195,11 +198,30 @@ class _ElderLocationMapCardState extends State<ElderLocationMapCard> with Single
  }
 
  Map<String, dynamic> _getCoordinates() {
+ try {
+ final locSvc = Provider.of<ElderLocationService>(context, listen: false);
+ final remote = locSvc.remoteElderLocation;
+ if (remote != null && remote['latitude'] is num && remote['longitude'] is num) {
+ final rLat = (remote['latitude'] as num).toDouble();
+ final rLng = (remote['longitude'] as num).toDouble();
+ final rAcc = (remote['accuracy'] is num) ? (remote['accuracy'] as num).toDouble() : 15.0;
+ final base = _getBaseCoordinates();
+ return {
+ 'lat': rLat,
+ 'lng': rLng,
+ 'accuracy': rAcc,
+ 'city': base['city'] ?? widget.locationText,
+ 'address': 'Live GPS (${rLat.toStringAsFixed(4)}° N, ${rLng.toStringAsFixed(4)}° E • ±${rAcc.toStringAsFixed(0)}m)',
+ };
+ }
+ } catch (_) {}
+
  if (_liveLat != null && _liveLng != null && _isLocationTurnedOn) {
  final base = _getBaseCoordinates();
  return {
  'lat': _liveLat!,
  'lng': _liveLng!,
+ 'accuracy': 15.0,
  'city': base['city'] ?? widget.locationText,
  'address': base['address'] ?? '${widget.locationText} • Main Sector Road',
  };
@@ -447,9 +469,8 @@ class _ElderLocationMapCardState extends State<ElderLocationMapCard> with Single
  label: const Text('Start Navigation Mode', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
  onPressed: () {
  Navigator.pop(ctx);
- ScaffoldMessenger.of(context).showSnackBar(
- SnackBar(content: Text(' Live navigation active for ${widget.elderName} (${coords["city"]})')),
- );
+ final locSvc = Provider.of<ElderLocationService>(context, listen: false);
+ locSvc.openDirectionsToElder(coords['lat'] as double, coords['lng'] as double);
  },
  ),
  ),
@@ -888,18 +909,60 @@ class _ElderLocationMapCardState extends State<ElderLocationMapCard> with Single
  // Action Buttons Bar
  Padding(
  padding: const EdgeInsets.symmetric(horizontal: 16),
- child: SizedBox(
- width: double.infinity,
+ child: Row(
+ children: [
+ Expanded(
  child: ElevatedButton.icon(
  style: ElevatedButton.styleFrom(
  backgroundColor: const Color(0xFF23B39B),
- padding: const EdgeInsets.symmetric(vertical: 12),
- shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+ padding: const EdgeInsets.symmetric(vertical: 10),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
  ),
- icon: const Icon(Icons.directions, color: Colors.white, size: 18),
- label: const Text('Directions', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+ icon: const Icon(Icons.map, color: Colors.white, size: 16),
+ label: const Text('Live Map', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+ onPressed: () {
+ Navigator.push(
+ context,
+ MaterialPageRoute(
+ builder: (_) => ElderLocationScreen(
+ elderId: widget.elderId,
+ elderName: widget.elderName,
+ ),
+ ),
+ );
+ },
+ ),
+ ),
+ const SizedBox(width: 8),
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF3B82F6),
+ padding: const EdgeInsets.symmetric(vertical: 10),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ icon: const Icon(Icons.open_in_new, color: Colors.white, size: 16),
+ label: const Text('Google Maps', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+ onPressed: () {
+ final locSvc = Provider.of<ElderLocationService>(context, listen: false);
+ locSvc.openInGoogleMaps(coords['lat'] as double, coords['lng'] as double);
+ },
+ ),
+ ),
+ const SizedBox(width: 8),
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF10B981),
+ padding: const EdgeInsets.symmetric(vertical: 10),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ icon: const Icon(Icons.directions, color: Colors.white, size: 16),
+ label: const Text('Directions', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
  onPressed: () => _showDirectionsModal(context, coords),
  ),
+ ),
+ ],
  ),
  ),
  const SizedBox(height: 16),

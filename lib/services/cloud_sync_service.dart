@@ -686,7 +686,205 @@ class CloudSyncService extends ChangeNotifier {
  final response = await pullScheduleCloudDetailed(elderId);
  return response.data;
  }
+
+ StreamSubscription? _sseLocationSubscription;
+ String _activeSseLocationElderId = '';
+
+ /// Push real GPS elder location to Cloud Relay (/locations/NER-XXXX.json)
+ Future<bool> pushLocationCloud({
+ required String elderId,
+ required double latitude,
+ required double longitude,
+ required double accuracy,
+ required bool isSharing,
+ double? altitude,
+ double? speed,
+ }) async {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty) return false;
+
+ try {
+ final payloadMap = {
+ 'elderId': targetId,
+ 'latitude': latitude,
+ 'longitude': longitude,
+ 'accuracy': accuracy,
+ 'isSharing': isSharing,
+ 'altitude': altitude ?? 0.0,
+ 'speed': speed ?? 0.0,
+ 'timestamp': DateTime.now().toUtc().toIso8601String(),
+ 'updatedAt': DateTime.now().toUtc().toIso8601String(),
+ 'updatedTimestamp': DateTime.now().millisecondsSinceEpoch,
+ };
+
+ _inMemoryCache['location_$targetId'] = payloadMap;
+ final prefs = await SharedPreferences.getInstance();
+ final payload = jsonEncode(payloadMap);
+ await prefs.setString('cloud_location_$targetId', payload);
+
+ debugPrint('CLOUD LOCATION PUSH: Elder=$targetId, Lat=$latitude, Lng=$longitude, Acc=$accuracy, Sharing=$isSharing');
+
+ bool anySuccess = false;
+ for (final fb in _firebaseEndpoints) {
+ try {
+ final url = Uri.parse('$fb/locations/$targetId.json');
+ final request = await _client.putUrl(url);
+ request.headers.contentType = ContentType.json;
+ request.write(payload);
+ final response = await request.close();
+ final body = await response.transform(utf8.decoder).join();
+ debugPrint('CLOUD LOCATION PUSH Firebase: status=${response.statusCode}, body=$body');
+ if (response.statusCode == 200) {
+ anySuccess = true;
+ }
+ } catch (e) {
+ debugPrint('CLOUD LOCATION PUSH Error ($fb): $e');
+ }
+ }
+
+ for (final kv in _kvEndpoints) {
+ try {
+ final url = Uri.parse('$kv/location_$targetId');
+ final request = await _client.putUrl(url);
+ request.headers.contentType = ContentType.json;
+ request.write(payload);
+ final response = await request.close();
+ await response.drain();
+ if (response.statusCode == 200) {
+ anySuccess = true;
+ }
+ } catch (_) {}
+ }
+
+ return anySuccess;
+ } catch (e) {
+ debugPrint('CloudSync push location error: $e');
+ return false;
+ }
+ }
+
+ /// Pull latest elder location from Cloud Relay (/locations/NER-XXXX.json)
+ Future<Map<String, dynamic>?> pullLocationCloud(String elderId) async {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty) return null;
+
+ final prefs = await SharedPreferences.getInstance();
+
+ for (final fb in _firebaseEndpoints) {
+ try {
+ final url = Uri.parse('$fb/locations/$targetId.json');
+ final request = await _client.getUrl(url);
+ final response = await request.close();
+ final body = await response.transform(utf8.decoder).join();
+
+ if (response.statusCode == 200 && body.trim().isNotEmpty && body != 'null') {
+ final decoded = jsonDecode(body);
+ if (decoded is Map<String, dynamic>) {
+ await prefs.setString('cloud_location_$targetId', body);
+ debugPrint('CLOUD LOCATION PULL: status=200 for $targetId');
+ return decoded;
+ }
+ }
+ } catch (e) {
+ debugPrint('CLOUD LOCATION PULL Firebase Error ($fb): $e');
+ }
+ }
+
+ for (final kv in _kvEndpoints) {
+ try {
+ final url = Uri.parse('$kv/location_$targetId');
+ final request = await _client.getUrl(url);
+ final response = await request.close();
+ final body = await response.transform(utf8.decoder).join();
+
+ if (response.statusCode == 200 && body.trim().isNotEmpty && body != 'null') {
+ final decoded = jsonDecode(body);
+ if (decoded is Map<String, dynamic>) {
+ await prefs.setString('cloud_location_$targetId', body);
+ return decoded;
+ }
+ }
+ } catch (_) {}
+ }
+
+ final localRaw = prefs.getString('cloud_location_$targetId');
+ if (localRaw != null && localRaw.isNotEmpty) {
+ try {
+ final decoded = jsonDecode(localRaw);
+ if (decoded is Map<String, dynamic>) {
+ return decoded;
+ }
+ } catch (_) {}
+ }
+
+ return null;
+ }
+
+ /// Subscribes to real-time Server-Sent Events (SSE) for Elder Location
+ void startRealtimeLocationListener(String elderId, Function(Map<String, dynamic>) onLocationReceived) {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty || targetId == _activeSseLocationElderId) return;
+
+ _activeSseLocationElderId = targetId;
+ try {
+ _sseLocationSubscription?.cancel();
+ } catch (_) {}
+
+ for (final fb in _firebaseEndpoints) {
+ try {
+ final url = Uri.parse('$fb/locations/$targetId.json');
+ HttpClient().getUrl(url).then((req) {
+ req.headers.add('Accept', 'text/event-stream');
+ return req.close();
+ }).then((response) {
+ if (response.statusCode == 200) {
+ debugPrint('REALTIME LOCATION SSE STREAM ESTABLISHED for $targetId');
+ _sseLocationSubscription = response
+ .transform(utf8.decoder)
+ .transform(const LineSplitter())
+ .listen((line) {
+ if (line.startsWith('data:')) {
+ final jsonStr = line.substring(6).trim();
+ if (jsonStr.isNotEmpty && jsonStr != 'null') {
+ try {
+ final decoded = jsonDecode(jsonStr);
+ if (decoded is Map<String, dynamic>) {
+ final payload = (decoded['data'] is Map<String, dynamic>)
+ ? Map<String, dynamic>.from(decoded['data'])
+ : decoded;
+ if (payload.containsKey('latitude') && payload.containsKey('longitude')) {
+ onLocationReceived(payload);
+ }
+ }
+ } catch (e) {
+ debugPrint('SSE Location JSON Parse Error: $e');
+ }
+ }
+ }
+ }, onError: (e) {
+ debugPrint('SSE Location Stream Error: $e');
+ _activeSseLocationElderId = '';
+ }, onDone: () {
+ _activeSseLocationElderId = '';
+ });
+ }
+ }).catchError((e) {
+ debugPrint('SSE Location Connection Error: $e');
+ _activeSseLocationElderId = '';
+ });
+ } catch (_) {}
+ }
+ }
+
+ void stopRealtimeLocationListener() {
+ try {
+ _sseLocationSubscription?.cancel();
+ } catch (_) {}
+ _sseLocationSubscription = null;
+ _activeSseLocationElderId = '';
+ }
 }
+
 
 enum CloudSyncStatus {
  found,

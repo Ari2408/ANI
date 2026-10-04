@@ -9,6 +9,7 @@ import 'cognitive_games_screen.dart';
 import 'schedule_reminders_screen.dart';
 import 'memory_lane_screen.dart';
 import 'caregiver_dashboard_screen.dart';
+import 'elder_location_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({Key? key}) : super(key: key);
@@ -333,6 +334,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               );
             },
           ),
+
+          // Caregiver Live Location Tracker Icon
+          if (isCaretaker)
+            IconButton(
+              icon: const Icon(Icons.location_on, color: Color(0xFF1B2824)),
+              tooltip: i18n.translate('elderLiveLocationTitle'),
+              onPressed: () {
+                final mappedId = user?.mappedElderId ?? 'NER-9431';
+                final elderProfile = auth.elderProfiles[mappedId];
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ElderLocationScreen(
+                      elderId: mappedId,
+                      elderName: elderProfile?['name']?.toString() ?? 'Elder ($mappedId)',
+                    ),
+                  ),
+                );
+              },
+            ),
 
           // Account Profile Icon
           IconButton(

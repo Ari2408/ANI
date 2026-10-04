@@ -147,6 +147,16 @@ class MainActivity : FlutterActivity() {
                     playEmergencyBeepAlarmSound(applicationContext)
                     result.success(true)
                 }
+                "startLocationSharingNotification" -> {
+                    val title = call.argument<String>("title") ?: "Location sharing is active"
+                    val body = call.argument<String>("body") ?: "Your location is being shared with your caregiver."
+                    showLocationSharingNotification(title, body)
+                    result.success(true)
+                }
+                "stopLocationSharingNotification" -> {
+                    cancelLocationSharingNotification()
+                    result.success(true)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -460,6 +470,62 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.e("PurbChetanaTTS", "Error playing emergency beep alarm sound", e)
         }
+    }
+
+    private val LOCATION_NOTIFICATION_ID = 99999
+    private val LOCATION_CHANNEL_ID = "purb_chetana_location_tracking"
+    private val LOCATION_CHANNEL_NAME = "Elder Location Tracking"
+
+    private fun showLocationSharingNotification(title: String, body: String) {
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val locChannel = NotificationChannel(
+                    LOCATION_CHANNEL_ID,
+                    LOCATION_CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Shows persistent status when Elder location sharing is active"
+                    setShowBadge(false)
+                }
+                notificationManager.createNotificationChannel(locChannel)
+            }
+
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            val pendingIntent = PendingIntent.getActivity(this, LOCATION_NOTIFICATION_ID, intent, flags)
+
+            var iconRes = applicationInfo.icon
+            if (iconRes == 0) {
+                iconRes = R.mipmap.ic_launcher
+            }
+
+            val builder = NotificationCompat.Builder(this, LOCATION_CHANNEL_ID)
+                .setSmallIcon(iconRes)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+
+            notificationManager.notify(LOCATION_NOTIFICATION_ID, builder.build())
+        } catch (e: Exception) {
+            android.util.Log.e("PurbChetanaLocation", "Error showing location notification", e)
+        }
+    }
+
+    private fun cancelLocationSharingNotification() {
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(LOCATION_NOTIFICATION_ID)
+        } catch (_: Exception) {}
     }
 }
 
