@@ -16,8 +16,19 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.purb_chetana/notifications"
+    private val STEP_CHANNEL = "com.purb_chetana/step_tracker"
     private val NOTIFICATION_CHANNEL_ID = "purb_chetana_reminders_v4"
     private val NOTIFICATION_CHANNEL_NAME = "Purb Chetana Reminders"
+    private var pendingActivityPermissionResult: MethodChannel.Result? = null
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 102) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
+            pendingActivityPermissionResult?.success(granted)
+            pendingActivityPermissionResult = null
+        }
+    }
 
     companion object {
         private var channel: MethodChannel? = null
@@ -156,6 +167,74 @@ class MainActivity : FlutterActivity() {
                 "stopLocationSharingNotification" -> {
                     cancelLocationSharingNotification()
                     result.success(true)
+                }
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+
+        val stepChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STEP_CHANNEL)
+        val stepManager = StepCounterManager.getInstance(applicationContext)
+        stepManager.addStepUpdateListener {
+            runOnUiThread {
+                try {
+                    stepChannel.invokeMethod("onStepCountChanged", stepManager.getTodayStepsData())
+                } catch (_: Exception) {}
+            }
+        }
+
+        stepChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isSensorAvailable" -> {
+                    result.success(stepManager.isSensorAvailable())
+                }
+                "hasPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val granted = checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        result.success(granted)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "requestPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val granted = checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        if (granted) {
+                            result.success(true)
+                        } else {
+                            pendingActivityPermissionResult = result
+                            requestPermissions(arrayOf(android.Manifest.permission.ACTIVITY_RECOGNITION), 102)
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "startTracking" -> {
+                    StepTrackingService.startService(applicationContext)
+                    result.success(true)
+                }
+                "stopTracking" -> {
+                    StepTrackingService.stopService(applicationContext)
+                    result.success(true)
+                }
+                "isTrackingActive" -> {
+                    result.success(StepTrackingService.isServiceRunning || stepManager.isTrackingEnabled())
+                }
+                "getTodaySteps" -> {
+                    result.success(stepManager.getTodayStepsData())
+                }
+                "getStepHistory" -> {
+                    result.success(stepManager.getDailyStepHistory())
+                }
+                "setDailyGoal" -> {
+                    val goal = call.argument<Int>("goal") ?: 10000
+                    stepManager.setDailyGoal(goal)
+                    result.success(true)
+                }
+                "refreshToday" -> {
+                    stepManager.checkDateRollover()
+                    result.success(stepManager.getTodayStepsData())
                 }
                 else -> {
                     result.notImplemented()
