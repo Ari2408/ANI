@@ -33,6 +33,15 @@ class AlarmReceiver : BroadcastReceiver() {
 
         if (action == Intent.ACTION_BOOT_COMPLETED || action == "android.intent.action.QUICKBOOT_POWERON") {
             restoreAlarmsOnBoot(context)
+            try {
+                val stepManager = StepCounterManager.getInstance(context)
+                if (stepManager.isTrackingEnabled()) {
+                    StepTrackingService.startService(context)
+                    android.util.Log.d("PurbChetanaSteps", "Restored StepTrackingService on boot")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PurbChetanaSteps", "Error restoring StepTrackingService on boot", e)
+            }
             return
         }
 

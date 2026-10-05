@@ -9,8 +9,10 @@ import '../models/reminder.dart';
 import '../widgets/elder_card.dart';
 import '../widgets/elder_button.dart';
 import '../widgets/elder_location_map_card.dart';
+import '../widgets/caregiver_activity_card.dart';
 import '../services/memory_lane_service.dart';
 import '../services/elder_location_service.dart';
+import '../services/step_tracker_service.dart';
 import 'elder_location_screen.dart';
 import 'memory_lane_screen.dart';
 
@@ -30,6 +32,8 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
  final mappedId = auth.currentUser?.mappedElderId ?? 'NER-9431';
  final locSvc = Provider.of<ElderLocationService>(context, listen: false);
  locSvc.listenToElderLocation(mappedId);
+ final stepTracker = Provider.of<StepTrackerService>(context, listen: false);
+ stepTracker.initForCaregiver(mappedId);
  });
  }
 
@@ -92,6 +96,8 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
  await schedule.loadSchedules(elderId: mappedElderId);
  final locSvc = Provider.of<ElderLocationService>(context, listen: false);
  await locSvc.refreshLocation(mappedElderId);
+ final stepTracker = Provider.of<StepTrackerService>(context, listen: false);
+ await stepTracker.fetchCaregiverElderActivity(mappedElderId);
  setState(() {});
  },
  child: ListView(
@@ -219,6 +225,12 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
  await locSvc.refreshLocation(mappedElderId);
  setState(() {});
  },
+ ),
+
+ // 1.75 Elder Live Activity & Step Counter Summary Card
+ CaregiverActivityCard(
+ elderName: elderProfile["name"]?.toString() ?? 'Elder ($mappedElderId)',
+ elderId: mappedElderId,
  ),
 
  // 1.8 Caregiver Personal Memory Upload Shortcut Card

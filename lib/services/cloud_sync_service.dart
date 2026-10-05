@@ -14,7 +14,6 @@ class CloudSyncService extends ChangeNotifier {
  // Firebase Realtime Database REST Endpoints with exact verified path structure
  static const List<String> _firebaseEndpoints = [
 'https://purb-chetana-default-rtdb.firebaseio.com',
-'https://purb-chetana-app-default-rtdb.asia-southeast1.firebasedatabase.app',
  ];
 
  static const List<String> _kvEndpoints = [
@@ -882,6 +881,260 @@ class CloudSyncService extends ChangeNotifier {
  } catch (_) {}
  _sseLocationSubscription = null;
  _activeSseLocationElderId = '';
+ }
+
+ StreamSubscription? _sseActivitySubscription;
+ String _activeSseActivityElderId = '';
+ Function(Map<String, dynamic>)? _activeActivityCallback;
+ Timer? _sseActivityReconnectTimer;
+
+ /// Push elder daily activity and step count to Cloud Relay (/activity/NER-XXXX.json)
+ Future<bool> pushElderActivityCloud(String elderId, Map<String, dynamic> activityData) async {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty) return false;
+
+ try {
+ final now = DateTime.now().toUtc();
+ final nowMs = now.millisecondsSinceEpoch;
+ final payloadMap = {
+ 'elderId': targetId,
+ 'activity': activityData,
+ 'today': activityData['today'] ?? activityData,
+ 'steps': (activityData['today'] is Map) ? activityData['today']['steps'] : activityData['steps'],
+ 'updatedAt': now.toIso8601String(),
+ 'updatedTimestamp': nowMs,
+ };
+
+ _inMemoryCache['activity_$targetId'] = payloadMap;
+ final prefs = await SharedPreferences.getInstance();
+ final payload = jsonEncode(payloadMap);
+ await prefs.setString('cloud_activity_$targetId', payload);
+
+ debugPrint('CLOUD ACTIVITY PUSH: Elder=$targetId, steps=${payloadMap["steps"]}');
+
+ bool anySuccess = false;
+ for (final fb in _firebaseEndpoints) {
+ try {
+ final url = Uri.parse('$fb/activity/$targetId.json');
+ final request = await _client.putUrl(url);
+ request.headers.contentType = ContentType.json;
+ request.write(payload);
+ final response = await request.close();
+ await response.drain();
+ debugPrint('CLOUD ACTIVITY PUSH Firebase: status=${response.statusCode}');
+ if (response.statusCode == 200) {
+ anySuccess = true;
+ }
+ } catch (e) {
+ debugPrint('CLOUD ACTIVITY PUSH Error ($fb): $e');
+ }
+ }
+
+ for (final kv in _kvEndpoints) {
+ try {
+ final url = Uri.parse('$kv/activity_$targetId');
+ final request = await _client.putUrl(url);
+ request.headers.contentType = ContentType.json;
+ request.write(payload);
+ final response = await request.close();
+ await response.drain();
+ if (response.statusCode == 200) {
+ anySuccess = true;
+ }
+ } catch (_) {}
+ }
+
+ return anySuccess;
+ } catch (e) {
+ debugPrint('CloudSync push activity error: $e');
+ return false;
+ }
+ }
+
+ /// Pull elder activity data from Cloud Relay (/activity/NER-XXXX.json)
+ Future<Map<String, dynamic>?> pullElderActivityCloud(String elderId, {bool forceFresh = false}) async {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty) return null;
+
+ final prefs = await SharedPreferences.getInstance();
+
+ for (final fb in _firebaseEndpoints) {
+ try {
+ final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+ final url = Uri.parse('$fb/activity/$targetId.json?ts=$cacheBuster');
+ final request = await _client.getUrl(url);
+ request.headers.add('Cache-Control', 'no-cache, no-store, must-revalidate');
+ request.headers.add('Pragma', 'no-cache');
+ final response = await request.close();
+ final body = await response.transform(utf8.decoder).join();
+
+ if (response.statusCode == 200 && body.trim().isNotEmpty && body != 'null') {
+ final decoded = jsonDecode(body);
+ if (decoded is Map<String, dynamic>) {
+ await prefs.setString('cloud_activity_$targetId', body);
+ debugPrint('CLOUD ACTIVITY PULL: status=200 for $targetId (fresh from network)');
+ final result = Map<String, dynamic>.from(decoded);
+ result['_isFromNetwork'] = true;
+ return result;
+ }
+ }
+ } catch (e) {
+ debugPrint('CLOUD ACTIVITY PULL Firebase Error ($fb): $e');
+ }
+ }
+
+ for (final kv in _kvEndpoints) {
+ try {
+ final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+ final url = Uri.parse('$kv/activity_$targetId?ts=$cacheBuster');
+ final request = await _client.getUrl(url);
+ request.headers.add('Cache-Control', 'no-cache, no-store, must-revalidate');
+ final response = await request.close();
+ final body = await response.transform(utf8.decoder).join();
+
+ if (response.statusCode == 200 && body.trim().isNotEmpty && body != 'null') {
+ final decoded = jsonDecode(body);
+ if (decoded is Map<String, dynamic>) {
+ await prefs.setString('cloud_activity_$targetId', body);
+ final result = Map<String, dynamic>.from(decoded);
+ result['_isFromNetwork'] = true;
+ return result;
+ }
+ }
+ } catch (_) {}
+ }
+
+ if (!forceFresh) {
+ final localRaw = prefs.getString('cloud_activity_$targetId');
+ if (localRaw != null && localRaw.isNotEmpty) {
+ try {
+ final decoded = jsonDecode(localRaw);
+ if (decoded is Map<String, dynamic>) {
+ final result = Map<String, dynamic>.from(decoded);
+ result['_isFromNetwork'] = false;
+ return result;
+ }
+ } catch (_) {}
+ }
+ }
+
+ return null;
+ }
+
+ /// Subscribes to real-time Server-Sent Events (SSE) for Elder Activity
+ void startRealtimeActivityListener(String elderId, Function(Map<String, dynamic>) onActivityReceived) {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty) return;
+
+ _activeActivityCallback = onActivityReceived;
+
+ if (targetId == _activeSseActivityElderId && _sseActivitySubscription != null) {
+ return;
+ }
+
+ _activeSseActivityElderId = targetId;
+ _connectActivitySse(targetId);
+ }
+
+ void _connectActivitySse(String targetId) {
+ try {
+ _sseActivitySubscription?.cancel();
+ } catch (_) {}
+ _sseActivitySubscription = null;
+ _sseActivityReconnectTimer?.cancel();
+
+ final fb = _firebaseEndpoints.first;
+ try {
+ final url = Uri.parse('$fb/activity/$targetId.json');
+ HttpClient().getUrl(url).then((req) {
+ req.headers.add('Accept', 'text/event-stream');
+ req.headers.add('Cache-Control', 'no-cache');
+ return req.close();
+ }).then((response) {
+ if (response.statusCode == 200) {
+ debugPrint('REALTIME ACTIVITY SSE STREAM ESTABLISHED for $targetId');
+ _sseActivitySubscription = response
+ .transform(utf8.decoder)
+ .transform(const LineSplitter())
+ .listen((line) {
+ if (line.startsWith('data:')) {
+ final jsonStr = line.replaceFirst(RegExp(r'^data:\s*'), '').trim();
+ if (jsonStr.isNotEmpty && jsonStr != 'null') {
+ try {
+ final decoded = jsonDecode(jsonStr);
+ if (decoded is Map<String, dynamic>) {
+ Map<String, dynamic>? payload;
+ if (decoded['data'] is Map<String, dynamic>) {
+ payload = Map<String, dynamic>.from(decoded['data']);
+ } else if (decoded.containsKey('data') && decoded['data'] is Map) {
+ payload = Map<String, dynamic>.from(decoded['data'] as Map);
+ } else if (decoded['data'] != null && decoded['path'] is String) {
+ final path = decoded['path'] as String;
+ if (path.contains('steps')) {
+ payload = {'steps': decoded['data']};
+ } else {
+ payload = {'data': decoded['data']};
+ }
+ } else {
+ payload = decoded;
+ }
+
+ if (payload != null && _activeActivityCallback != null) {
+ payload['_isFromNetwork'] = true;
+ _activeActivityCallback!(payload);
+ }
+ }
+ } catch (e) {
+ debugPrint('SSE Activity JSON Parse Error: $e');
+ }
+ }
+ }
+ }, onError: (e) {
+ debugPrint('SSE Activity Stream Error: $e');
+ _scheduleActivityReconnect(targetId);
+ }, onDone: () {
+ debugPrint('SSE Activity Stream closed');
+ _scheduleActivityReconnect(targetId);
+ });
+ } else {
+ _scheduleActivityReconnect(targetId);
+ }
+ }).catchError((e) {
+ debugPrint('SSE Activity Connection Error: $e');
+ _scheduleActivityReconnect(targetId);
+ });
+ } catch (_) {
+ _scheduleActivityReconnect(targetId);
+ }
+ }
+
+ void _scheduleActivityReconnect(String targetId) {
+ _sseActivityReconnectTimer?.cancel();
+ _sseActivityReconnectTimer = Timer(const Duration(seconds: 4), () {
+ if (_activeSseActivityElderId == targetId && _activeActivityCallback != null) {
+ debugPrint('Auto-reconnecting SSE Activity Stream for $targetId...');
+ _connectActivitySse(targetId);
+ }
+ });
+ }
+
+ void reconnectRealtimeActivity(String elderId) {
+ final targetId = cleanId(elderId);
+ if (targetId.isNotEmpty) {
+ _activeSseActivityElderId = targetId;
+ _connectActivitySse(targetId);
+ }
+ }
+
+ void stopRealtimeActivityListener() {
+ _sseActivityReconnectTimer?.cancel();
+ _sseActivityReconnectTimer = null;
+ try {
+ _sseActivitySubscription?.cancel();
+ } catch (_) {}
+ _sseActivitySubscription = null;
+ _activeSseActivityElderId = '';
+ _activeActivityCallback = null;
  }
 }
 

@@ -10,7 +10,9 @@ import '../services/memory_lane_service.dart';
 import '../widgets/elder_card.dart';
 import '../widgets/elder_button.dart';
 import '../widgets/elder_location_sharing_card.dart';
+import '../widgets/elder_step_tracker_card.dart';
 import '../services/elder_location_service.dart';
+import '../services/step_tracker_service.dart';
 
 import 'games/routine_recall_game_screen.dart';
 import 'games/familiar_faces_game_screen.dart';
@@ -39,6 +41,10 @@ class PatientHomeScreen extends StatelessWidget {
  final loc = Provider.of<ElderLocationService>(context, listen: false);
  if (auth.isElder && activeElderId.isNotEmpty && !loc.isTracking && loc.isSharingActive) {
  loc.initElderTracking(activeElderId);
+ }
+ final stepTracker = Provider.of<StepTrackerService>(context, listen: false);
+ if (auth.isElder && activeElderId.isNotEmpty && !stepTracker.isInitialized) {
+ stepTracker.initForElder(activeElderId);
  }
  });
 
@@ -76,6 +82,8 @@ class PatientHomeScreen extends StatelessWidget {
  if (auth.isElder) {
  final locSvc = Provider.of<ElderLocationService>(context, listen: false);
  await locSvc.refreshElderCurrentLocation();
+ final stepTracker = Provider.of<StepTrackerService>(context, listen: false);
+ await stepTracker.refreshElderToday();
  }
  }
  },
@@ -192,6 +200,10 @@ class PatientHomeScreen extends StatelessWidget {
  );
  },
  ),
+
+ // Elder Daily Activity & Step Counter Card
+ if (auth.isElder)
+ const ElderStepTrackerCard(),
 
  // Elder Live Location Sharing Status Card
  if (auth.isElder)
