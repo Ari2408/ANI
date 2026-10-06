@@ -17,7 +17,7 @@ class CloudSyncService extends ChangeNotifier {
  ];
 
  static const List<String> _kvEndpoints = [
-'https://kvdb.io/PurbChetanaApp2026KeyValStore',
+'https://kvdb.io/AninaiApp2026KeyValStore',
  ];
 
  final HttpClient _client = HttpClient()

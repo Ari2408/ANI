@@ -11,6 +11,7 @@ import '../widgets/elder_card.dart';
 import '../widgets/elder_button.dart';
 import '../widgets/elder_location_sharing_card.dart';
 import '../widgets/elder_step_tracker_card.dart';
+import '../widgets/battery_status_widget.dart';
 import '../services/elder_location_service.dart';
 import '../services/step_tracker_service.dart';
 
@@ -99,10 +100,18 @@ class PatientHomeScreen extends StatelessWidget {
  child: Column(
  crossAxisAlignment: CrossAxisAlignment.start,
  children: [
- Text(
+ Row(
+ mainAxisAlignment: MainAxisAlignment.spaceBetween,
+ children: [
+ Expanded(
+ child: Text(
  '${i18n.translate("todayDate")}, 8 ${i18n.translate("septemberDate")} 2026',
- style: TextStyle(color: Color(0xFF1B2824), fontSize: 13, fontWeight: FontWeight.w600),
+ style: const TextStyle(color: Color(0xFF1B2824), fontSize: 13, fontWeight: FontWeight.w600),
  softWrap: true,
+ ),
+ ),
+ const BatteryStatusWidget(),
+ ],
  ),
  SizedBox(height: 10),
  Text(

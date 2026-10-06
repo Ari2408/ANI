@@ -35,9 +35,9 @@ class EmailJSService {
         'otp': otpCode,
         'otp_code': otpCode,
         'code': otpCode,
-        'message': 'Your Purb Chetana verification OTP code is: $otpCode',
+        'message': 'Your Aninai verification OTP code is: $otpCode',
         'expiry_minutes': 5,
-        'app_name': 'Purb Chetana AI Platform',
+        'app_name': 'Aninai AI Platform',
       }
     };
 

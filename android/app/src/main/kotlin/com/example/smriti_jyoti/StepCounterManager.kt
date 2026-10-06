@@ -19,7 +19,7 @@ class StepCounterManager private constructor(private val context: Context) : Sen
 
     companion object {
         private const val TAG = "StepCounterManager"
-        private const val PREFS_NAME = "purb_chetana_steps"
+        private const val PREFS_NAME = "aninai_steps"
 
         private const val KEY_TRACKING_ENABLED = "tracking_enabled"
         private const val KEY_DAILY_GOAL = "daily_goal"

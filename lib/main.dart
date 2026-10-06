@@ -10,6 +10,7 @@ import 'services/webrtc_service.dart';
 import 'services/news_service.dart';
 import 'services/elder_location_service.dart';
 import 'services/step_tracker_service.dart';
+import 'services/battery_service.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/auth_onboarding_screen.dart';
 import 'screens/animated_splash_intro_screen.dart';
@@ -19,11 +20,11 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.init();
-  runApp(const PurbChetanaApp());
+  runApp(const AninaiApp());
 }
 
-class PurbChetanaApp extends StatelessWidget {
-  const PurbChetanaApp({Key? key}) : super(key: key);
+class AninaiApp extends StatelessWidget {
+  const AninaiApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +46,14 @@ class PurbChetanaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NewsService()),
         ChangeNotifierProvider(create: (_) => ElderLocationService()),
         ChangeNotifierProvider(create: (_) => StepTrackerService()),
+        ChangeNotifierProxyProvider<I18nService, BatteryService>(
+          create: (_) => BatteryService()..initBatteryMonitoring(),
+          update: (_, i18n, battery) {
+            battery?.updateI18n(i18n);
+            battery?.initBatteryMonitoring(i18n: i18n);
+            return battery ?? (BatteryService()..initBatteryMonitoring(i18n: i18n));
+          },
+        ),
       ],
       child: Consumer<I18nService>(
         builder: (context, i18n, child) {

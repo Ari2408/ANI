@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'voice_cloning_service.dart';
 
 class NotificationService {
-  static const MethodChannel _channel = MethodChannel('com.purb_chetana/notifications');
+  static const MethodChannel _channel = MethodChannel('com.aninai/notifications');
   static final FlutterTts _tts = FlutterTts();
   static final AudioPlayer _customVoicePlayer = AudioPlayer();
   static bool _ttsInitialized = false;
@@ -43,7 +43,11 @@ class NotificationService {
         _ttsInitialized = true;
       }
     } catch (e) {
-      debugPrint('NotificationService init TTS error: $e');
+      if (e.toString().contains('MissingPluginException')) {
+        debugPrint('TTS Plugin: Requires cold app launch to bind platform channel (handled gracefully).');
+      } else {
+        debugPrint('NotificationService init TTS error: $e');
+      }
     }
   }
 

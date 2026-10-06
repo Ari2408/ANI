@@ -12,7 +12,7 @@ import 'notification_service.dart';
 import 'cloud_sync_service.dart';
 
 class MemoryLaneService extends ChangeNotifier {
-  static const String _storageKey = 'purb_chetana_custom_memories';
+  static const String _storageKey = 'aninai_custom_memories';
 
   List<MemoryItem> _memories = [];
   bool _isLoaded = false;

@@ -436,7 +436,7 @@ class _AuthOnboardingScreenState extends State<AuthOnboardingScreen> {
  return Column(
  crossAxisAlignment: CrossAxisAlignment.stretch,
  children: [
- // Purb Chetana Logo & Welcome Header
+ // Aninai Logo & Welcome Header
  Row(
  mainAxisAlignment: MainAxisAlignment.center,
  children: [
@@ -756,7 +756,7 @@ class _AuthOnboardingScreenState extends State<AuthOnboardingScreen> {
  aiEngine.resetForNewUser();
  await _showSuccessDialog(
  title: 'Login Successful! ',
- message: 'Welcome back to Purb Chetana!',
+ message: 'Welcome back to Aninai!',
  onProceed: widget.onComplete,
  );
  } else {
@@ -1187,7 +1187,7 @@ class _AuthOnboardingScreenState extends State<AuthOnboardingScreen> {
  onPressed: () async {
  await _showSuccessDialog(
  title: 'Account Ready! ',
- message: 'Your Elder account is ready. Welcome to Purb Chetana!',
+ message: 'Your Elder account is ready. Welcome to Aninai !',
  code: _generatedElderId,
  onProceed: widget.onComplete,
  );

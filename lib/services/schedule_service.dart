@@ -176,7 +176,7 @@ class ScheduleService extends ChangeNotifier {
 
  final prefs = await SharedPreferences.getInstance();
  if (_currentElderId.isNotEmpty) {
- await prefs.remove('purb_chetana_schedules_$_currentElderId');
+ await prefs.remove('aninai_schedules_$_currentElderId');
  await prefs.remove('cloud_schedules_$_currentElderId');
  }
 
@@ -213,7 +213,7 @@ class ScheduleService extends ChangeNotifier {
 
  await HiveService.init();
  final prefs = await SharedPreferences.getInstance();
- final key ='purb_chetana_schedules_$targetId';
+ final key ='aninai_schedules_$targetId';
  String? raw = prefs.getString(key);
 
  _reminders.clear();
@@ -236,14 +236,14 @@ class ScheduleService extends ChangeNotifier {
  }
 
  if (targetId.isNotEmpty) {
- final hydKey ='purb_chetana_hydration_$targetId';
+ final hydKey ='aninai_hydration_$targetId';
  final hydState = HiveService.getHydrationStateForElder(targetId);
  _hydrationTargetLiters = prefs.getDouble(hydKey) ?? (hydState?['targetLiters'] as num?)?.toDouble() ?? 2.0;
  _hydrationCurrentGlasses = prefs.getInt('${hydKey}_glasses') ?? (hydState?['currentGlasses'] as num?)?.toInt() ?? 0;
 
- _breakfastVoicePath = prefs.getString('purb_chetana_meal_voice_breakfast_$targetId') ?? prefs.getString('purb_chetana_meal_voice_breakfast');
- _lunchVoicePath = prefs.getString('purb_chetana_meal_voice_lunch_$targetId') ?? prefs.getString('purb_chetana_meal_voice_lunch');
- _dinnerVoicePath = prefs.getString('purb_chetana_meal_voice_dinner_$targetId') ?? prefs.getString('purb_chetana_meal_voice_dinner');
+ _breakfastVoicePath = prefs.getString('aninai_meal_voice_breakfast_$targetId') ?? prefs.getString('aninai_meal_voice_breakfast');
+ _lunchVoicePath = prefs.getString('aninai_meal_voice_lunch_$targetId') ?? prefs.getString('aninai_meal_voice_lunch');
+ _dinnerVoicePath = prefs.getString('aninai_meal_voice_dinner_$targetId') ?? prefs.getString('aninai_meal_voice_dinner');
  }
 
  // Fetch cloud sync schedules for active Elder ID
@@ -289,8 +289,8 @@ class ScheduleService extends ChangeNotifier {
 
  Future<void> setMealVoicePath(String mealKey, String? path) async {
  final prefs = await SharedPreferences.getInstance();
- final key = 'purb_chetana_meal_voice_${mealKey}_$_currentElderId';
- final globalKey = 'purb_chetana_meal_voice_$mealKey';
+ final key = 'aninai_meal_voice_${mealKey}_$_currentElderId';
+ final globalKey = 'aninai_meal_voice_$mealKey';
  if (path != null && path.isNotEmpty) {
  if (mealKey == 'breakfast') _breakfastVoicePath = path;
  if (mealKey == 'lunch') _lunchVoicePath = path;
@@ -328,7 +328,7 @@ class ScheduleService extends ChangeNotifier {
 
  void _scanAndLoadMealVoicesFromDiskSync() {
  try {
- final dir = Directory('/data/user/0/com.example.purb_chetana/app_flutter');
+ final dir = Directory('/data/user/0/com.example.aninai/app_flutter');
  if (!dir.existsSync()) return;
  final files = dir.listSync().whereType<File>().toList();
  if (_breakfastVoicePath == null || !File(_breakfastVoicePath!).existsSync()) {
@@ -420,12 +420,12 @@ class ScheduleService extends ChangeNotifier {
  await HiveService.saveHydrationStateForElder(targetId, _hydrationTargetLiters, _hydrationCurrentGlasses);
 
  final prefs = await SharedPreferences.getInstance();
- final key ='purb_chetana_schedules_$targetId';
+ final key ='aninai_schedules_$targetId';
  final encoded = jsonEncode(_reminders.map((r) => r.toJson()).toList());
  _lastSavedJson = encoded;
  await prefs.setString(key, encoded);
 
- final hydKey ='purb_chetana_hydration_$targetId';
+ final hydKey ='aninai_hydration_$targetId';
  await prefs.setDouble(hydKey, _hydrationTargetLiters);
  await prefs.setInt('${hydKey}_glasses', _hydrationCurrentGlasses);
 

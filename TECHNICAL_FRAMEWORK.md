@@ -1,5 +1,5 @@
 # 🛠️ Technical Framework Documentation
-## Purb Chetana (পূৰ্ব চেতনা / பூர்ப் சேதனா) — AI Elderly Cognitive & Memory Assistance Platform
+## Aninai (পূৰ্ব চেতনা / பூர்ப் சேதனா) — AI Elderly Cognitive & Memory Assistance Platform
 
 > **Target Demographic**: Elderly Dementia & Alzheimer's Patients in the North-Eastern Region (Assam, Meghalaya, Manipur, Tripura, etc.) & Tamil Nadu, along with their family caretakers.
 
@@ -7,7 +7,7 @@
 
 ## 📐 1. System Architecture Overview
 
-Purb Chetana is built as a **hybrid multi-platform application** operating synchronously across Flutter (Android, iOS, Web) and a progressive HTML5/CSS3 web runtime.
+Aninai is built as a **hybrid multi-platform application** operating synchronously across Flutter (Android, iOS, Web) and a progressive HTML5/CSS3 web runtime.
 
 ```mermaid
 graph TD

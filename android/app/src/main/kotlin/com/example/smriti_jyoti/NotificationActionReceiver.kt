@@ -31,8 +31,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val isHydrationIntent = intent.getBooleanExtra("isHydration", false) || action.contains("ACTION_LOG_WATER") || reminderId == "hyd" || reminderId.startsWith("hyd_")
         val isRoutine = reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine") || title.contains("Daily Activity") || title.contains("தினசரி") || title.contains("dinasari")
 
-        if (action == "com.purb_chetana.ACTION_TAKEN" && reminderId.isNotEmpty() && !isHydrationIntent) {
-            val compPrefs = context.getSharedPreferences("purb_chetana_completed_reminders", Context.MODE_PRIVATE)
+        if (action == "com.aninai.ACTION_TAKEN" && reminderId.isNotEmpty() && !isHydrationIntent) {
+            val compPrefs = context.getSharedPreferences("aninai_completed_reminders", Context.MODE_PRIVATE)
             compPrefs.edit().putBoolean(reminderId, true).apply()
 
             // Cancel scheduled alarm and follow-up 1-minute retry alarms for attempt 2 and attempt 3
@@ -42,7 +42,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val alarmIds = listOf(baseId, baseId * 10 + 2, baseId * 10 + 3)
                 for (retryId in alarmIds) {
                     val cancelIntent = Intent(context, AlarmReceiver::class.java).apply {
-                        setAction("com.purb_chetana.ACTION_TRIGGER_ALARM")
+                        setAction("com.aninai.ACTION_TRIGGER_ALARM")
                     }
                     val pi = PendingIntent.getBroadcast(
                         context,

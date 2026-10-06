@@ -15,10 +15,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.purb_chetana/notifications"
-    private val STEP_CHANNEL = "com.purb_chetana/step_tracker"
-    private val NOTIFICATION_CHANNEL_ID = "purb_chetana_reminders_v4"
-    private val NOTIFICATION_CHANNEL_NAME = "Purb Chetana Reminders"
+    private val CHANNEL = "com.aninai/notifications"
+    private val STEP_CHANNEL = "com.aninai/step_tracker"
+    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v4"
+    private val NOTIFICATION_CHANNEL_NAME = "Aninai Reminders"
     private var pendingActivityPermissionResult: MethodChannel.Result? = null
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -107,7 +107,7 @@ class MainActivity : FlutterActivity() {
         mChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "showNotification" -> {
-                    val title = call.argument<String>("title") ?: "Purb Chetana Reminder"
+                    val title = call.argument<String>("title") ?: "Aninai Reminder"
                     val body = call.argument<String>("body") ?: "You have a scheduled reminder."
                     val id = call.argument<Int>("id") ?: (System.currentTimeMillis() % 100000).toInt()
                     val reminderId = call.argument<String>("reminderId") ?: ""
@@ -284,13 +284,13 @@ class MainActivity : FlutterActivity() {
                 yetToTakeLabel
             }
 
-            val prefs = getSharedPreferences("purb_chetana_native_alarms", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("aninai_native_alarms", Context.MODE_PRIVATE)
             val valueStr = "$id|||$triggerAtMs|||$title|||$body|||$reminderId|||$finalTakenLabel|||$finalYetToTakeLabel|||$spokenText|||$langCode|||$isHydration|||$effectiveCustomVoicePath|||$effectiveVoiceMode|||$effectiveClonedVoiceSamplePath|||$fallbackText|||$showActions"
             prefs.edit().putString(id.toString(), valueStr).apply()
 
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             val intent = Intent(this, AlarmReceiver::class.java).apply {
-                action = "com.purb_chetana.ACTION_TRIGGER_ALARM"
+                action = "com.aninai.ACTION_TRIGGER_ALARM"
                 putExtra("id", id)
                 putExtra("title", title)
                 putExtra("body", body)
@@ -351,12 +351,12 @@ class MainActivity : FlutterActivity() {
 
     private fun cancelNativeAlarm(id: Int) {
         try {
-            val prefs = getSharedPreferences("purb_chetana_native_alarms", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("aninai_native_alarms", Context.MODE_PRIVATE)
             prefs.edit().remove(id.toString()).apply()
 
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             val intent = Intent(this, AlarmReceiver::class.java).apply {
-                action = "com.purb_chetana.ACTION_TRIGGER_ALARM"
+                action = "com.aninai.ACTION_TRIGGER_ALARM"
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 this,
@@ -373,9 +373,9 @@ class MainActivity : FlutterActivity() {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
             try {
-                notificationManager.deleteNotificationChannel("purb_chetana_reminders")
-                notificationManager.deleteNotificationChannel("purb_chetana_reminders_v2")
-                notificationManager.deleteNotificationChannel("purb_chetana_reminders_v3")
+                notificationManager.deleteNotificationChannel("aninai_reminders")
+                notificationManager.deleteNotificationChannel("aninai_reminders_v2")
+                notificationManager.deleteNotificationChannel("aninai_reminders_v3")
             } catch (_: Exception) {}
 
             val channel = NotificationChannel(
@@ -426,7 +426,7 @@ class MainActivity : FlutterActivity() {
 
         // Action 1: TAKEN (Localized)
         val takenIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-            action = "com.purb_chetana.ACTION_TAKEN"
+            action = "com.aninai.ACTION_TAKEN"
             putExtra("reminderId", reminderId)
             putExtra("notificationId", id)
         }
@@ -434,7 +434,7 @@ class MainActivity : FlutterActivity() {
 
         // Action 2: YET TO TAKE (Localized)
         val yetToTakeIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-            action = "com.purb_chetana.ACTION_YET_TO_TAKE"
+            action = "com.aninai.ACTION_YET_TO_TAKE"
             putExtra("reminderId", reminderId)
             putExtra("notificationId", id)
         }
@@ -461,7 +461,7 @@ class MainActivity : FlutterActivity() {
         val isAppointment = isAppointmentReminder(reminderId, title, body)
         if (isHydration) {
             val logWaterIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-                action = "com.purb_chetana.ACTION_LOG_WATER"
+                action = "com.aninai.ACTION_LOG_WATER"
                 putExtra("reminderId", if (reminderId.isNotEmpty()) reminderId else "hyd")
                 putExtra("notificationId", id)
                 putExtra("isHydration", true)
@@ -537,7 +537,7 @@ class MainActivity : FlutterActivity() {
                     }
                     toneGen.release()
                 } catch (e: Exception) {
-                    android.util.Log.e("PurbChetanaTTS", "Error generating emergency beep tones", e)
+                    android.util.Log.e("AninaiTTS", "Error generating emergency beep tones", e)
                 }
             }.start()
 
@@ -545,14 +545,14 @@ class MainActivity : FlutterActivity() {
                 try { ringtone?.stop() } catch (_: Exception) {}
             }, 10000)
 
-            android.util.Log.d("PurbChetanaTTS", "Played Emergency Beep Alarm Sound for Caregiver Alert")
+            android.util.Log.d("AninaiTTS", "Played Emergency Beep Alarm Sound for Caregiver Alert")
         } catch (e: Exception) {
-            android.util.Log.e("PurbChetanaTTS", "Error playing emergency beep alarm sound", e)
+            android.util.Log.e("AninaiTTS", "Error playing emergency beep alarm sound", e)
         }
     }
 
     private val LOCATION_NOTIFICATION_ID = 99999
-    private val LOCATION_CHANNEL_ID = "purb_chetana_location_tracking"
+    private val LOCATION_CHANNEL_ID = "aninai_location_tracking"
     private val LOCATION_CHANNEL_NAME = "Elder Location Tracking"
 
     private fun showLocationSharingNotification(title: String, body: String) {
@@ -596,7 +596,7 @@ class MainActivity : FlutterActivity() {
 
             notificationManager.notify(LOCATION_NOTIFICATION_ID, builder.build())
         } catch (e: Exception) {
-            android.util.Log.e("PurbChetanaLocation", "Error showing location notification", e)
+            android.util.Log.e("AninaiLocation", "Error showing location notification", e)
         }
     }
 
