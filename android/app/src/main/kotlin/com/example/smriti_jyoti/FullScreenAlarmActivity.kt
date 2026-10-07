@@ -21,6 +21,8 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.OvershootInterpolator
+import android.graphics.BitmapFactory
+import android.widget.ImageView
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -85,6 +87,8 @@ class FullScreenAlarmActivity : Activity() {
         val rawYetToTakeLabel = intent.getStringExtra("yetToTakeLabel") ?: ""
         val isHydration = intent.getBooleanExtra("isHydration", false)
         val langCode = intent.getStringExtra("langCode") ?: "en"
+        val medicineImagePath = intent.getStringExtra("medicineImagePath") ?: ""
+        val pillsCount = intent.getStringExtra("pillsCount") ?: ""
         currentLangCode = langCode
 
         val isRoutine = reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine") ||
@@ -155,7 +159,7 @@ class FullScreenAlarmActivity : Activity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                setMargins(0, 16, 0, 32)
+                setMargins(0, 16, 0, 24)
             }
         }
 
@@ -182,6 +186,68 @@ class FullScreenAlarmActivity : Activity() {
         }
         iconContainer.addView(iconBadge)
         rootLayout.addView(iconContainer)
+
+        // Display Uploaded Medicine Image from Gallery (if available)
+        if (medicineImagePath.isNotEmpty() && java.io.File(medicineImagePath).exists()) {
+            try {
+                val bitmap = BitmapFactory.decodeFile(medicineImagePath)
+                if (bitmap != null) {
+                    val density = resources.displayMetrics.density
+                    val imgPx = (200 * density).toInt()
+                    val imgView = ImageView(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(imgPx, imgPx).apply {
+                            gravity = Gravity.CENTER_HORIZONTAL
+                            setMargins(0, 8, 0, 20)
+                        }
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        setImageBitmap(bitmap)
+                        background = GradientDrawable().apply {
+                            cornerRadius = 32f
+                            setStroke(6, Color.parseColor("#38BDF8"))
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            clipToOutline = true
+                        }
+                    }
+                    rootLayout.addView(imgView)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AninaiAlarm", "Error decoding medicine image in FullScreenAlarmActivity", e)
+            }
+        }
+
+        // Display Pills Count Badge on Lock Screen
+        val effectivePills = if (pillsCount.isNotEmpty()) pillsCount else ""
+        if (effectivePills.isNotEmpty() || (!isRoutine && !isHydration)) {
+            val pillsBadgeText = if (effectivePills.isNotEmpty()) {
+                if (langCode == "ta") "💊 மாத்திரைகளின் எண்ணிக்கை: $effectivePills" else "💊 Number of Pills: $effectivePills"
+            } else {
+                ""
+            }
+            if (pillsBadgeText.isNotEmpty()) {
+                val pillsBadgeTv = TextView(this).apply {
+                    text = pillsBadgeText
+                    textSize = 18f
+                    setTextColor(Color.parseColor("#38BDF8"))
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    setPadding(32, 14, 32, 14)
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#1E293B"))
+                        cornerRadius = 24f
+                        setStroke(3, Color.parseColor("#38BDF8"))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        setMargins(0, 4, 0, 20)
+                    }
+                }
+                rootLayout.addView(pillsBadgeTv)
+            }
+        }
 
         // Pulsing Icon & Ring Animations
         val iconScaleX = ObjectAnimator.ofFloat(iconBadge, View.SCALE_X, 1.0f, 1.22f, 1.0f)

@@ -18,6 +18,7 @@ class ReminderItem {
   List<int> completedDays; // 0 = Mon, 1 = Tue, ..., 6 = Sun
   int reminderAttempt; // 1 = 1st reminder, 2 = 2nd reminder, 3 = 3rd reminder
   final String createdByRole; // 'elder' or 'caretaker'
+  final String medicineImagePath;
 
   ReminderItem({
     required this.id,
@@ -34,6 +35,7 @@ class ReminderItem {
     List<int>? completedDays,
     this.reminderAttempt = 1,
     this.createdByRole = 'caretaker',
+    this.medicineImagePath = '',
   }) : completedDays = completedDays ?? (isCompleted ? [DateTime.now().weekday - 1] : []);
 
   bool isCompletedForDay(int dayIndex) {
@@ -64,6 +66,7 @@ class ReminderItem {
         'completedDays': completedDays,
         'reminderAttempt': reminderAttempt,
         'createdByRole': createdByRole,
+        'medicineImagePath': medicineImagePath,
       };
 
   factory ReminderItem.fromJson(Map<String, dynamic> json) {
@@ -150,6 +153,7 @@ class ReminderItem {
       completedDays: parsedCompletedDays,
       reminderAttempt: json['reminderAttempt'] is int ? json['reminderAttempt'] as int : 1,
       createdByRole: json['createdByRole'] ?? 'caretaker',
+      medicineImagePath: json['medicineImagePath'] ?? '',
     );
   }
 

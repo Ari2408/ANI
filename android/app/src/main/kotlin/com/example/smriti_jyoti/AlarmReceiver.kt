@@ -66,6 +66,8 @@ class AlarmReceiver : BroadcastReceiver() {
             val rawTakenLabel = intent.getStringExtra("takenLabel") ?: ""
             val rawYetToTakeLabel = intent.getStringExtra("yetToTakeLabel") ?: ""
             val isHydration = intent.getBooleanExtra("isHydration", false)
+            val medicineImagePath = intent.getStringExtra("medicineImagePath") ?: ""
+            val pillsCount = intent.getStringExtra("pillsCount") ?: ""
             val spokenText = intent.getStringExtra("spokenText") ?: "$title. $body"
             val fallbackText = intent.getStringExtra("fallbackText") ?: ""
             val customVoicePath = intent.getStringExtra("customVoicePath") ?: ""
@@ -161,8 +163,8 @@ class AlarmReceiver : BroadcastReceiver() {
             )
             wakeLock.acquire(15000)
 
-            // 1b. Launch FullScreenAlarmActivity to arrest screen until an option button is selected
-            if (attemptCount < 4) {
+            // 1b. Launch FullScreenAlarmActivity to arrest screen until an option button is selected (Suppressed for Hydration)
+            if (attemptCount < 4 && !isHydration && reminderId != "hyd") {
                 try {
                     val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
@@ -174,6 +176,8 @@ class AlarmReceiver : BroadcastReceiver() {
                         putExtra("yetToTakeLabel", yetToTakeLabel)
                         putExtra("isHydration", isHydration)
                         putExtra("langCode", langCode)
+                        putExtra("medicineImagePath", medicineImagePath)
+                        putExtra("pillsCount", pillsCount)
                     }
                     val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
                     val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, piFlags)
@@ -188,7 +192,7 @@ class AlarmReceiver : BroadcastReceiver() {
             }
 
             // 2. Show High Priority System Notification Banner
-            showSystemNotification(context, id, reminderId, displayTitle, displayBody, takenLabel, yetToTakeLabel, isHydration, showActions, langCode)
+            showSystemNotification(context, id, reminderId, displayTitle, displayBody, takenLabel, yetToTakeLabel, isHydration, showActions, langCode, medicineImagePath, pillsCount)
 
             // 3. For 4th Notification (Caregiver Alert), play Emergency Beep Alarm Sound instead of voice!
             if (attemptCount >= 4) {
@@ -278,6 +282,8 @@ class AlarmReceiver : BroadcastReceiver() {
                     putExtra("isHydration", false)
                     putExtra("showActions", showActions)
                     putExtra("attemptCount", nextAttempt)
+                    putExtra("medicineImagePath", medicineImagePath)
+                    putExtra("pillsCount", pillsCount)
                 }
 
                 val pendingIntent = PendingIntent.getBroadcast(
@@ -688,6 +694,8 @@ class AlarmReceiver : BroadcastReceiver() {
 
                         val fallbackText = parts.getOrNull(13) ?: ""
                         val showActions = parts.getOrNull(14)?.toBoolean() ?: (!isAppointmentReminder(reminderId, title, body))
+                        val medicineImagePath = parts.getOrNull(15) ?: ""
+                        val pillsCount = parts.getOrNull(16) ?: ""
 
                         if (triggerAtMs > System.currentTimeMillis()) {
                             val alarmIntent = Intent(context, AlarmReceiver::class.java).apply {
@@ -706,6 +714,8 @@ class AlarmReceiver : BroadcastReceiver() {
                                 putExtra("langCode", langCode)
                                 putExtra("isHydration", isHydration)
                                 putExtra("showActions", showActions)
+                                putExtra("medicineImagePath", medicineImagePath)
+                                putExtra("pillsCount", pillsCount)
                             }
                             val pendingIntent = PendingIntent.getBroadcast(
                                 context,
@@ -744,7 +754,9 @@ class AlarmReceiver : BroadcastReceiver() {
         yetToTakeLabel: String,
         isHydration: Boolean,
         showActions: Boolean = true,
-        langCode: String = "en"
+        langCode: String = "en",
+        medicineImagePath: String = "",
+        pillsCount: String = ""
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -784,6 +796,8 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra("yetToTakeLabel", yetToTakeLabel)
             putExtra("isHydration", isHydration)
             putExtra("langCode", langCode)
+            putExtra("medicineImagePath", medicineImagePath)
+            putExtra("pillsCount", pillsCount)
         }
         val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, activityFlags)
 
@@ -818,13 +832,16 @@ class AlarmReceiver : BroadcastReceiver() {
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setVibrate(longArrayOf(0, 500, 250, 500))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
+
+        if (!isHydration && reminderId != "hyd") {
+            builder.setFullScreenIntent(fullScreenPendingIntent, true)
+        }
 
         val isAppointment = isAppointmentReminder(reminderId, title, body)
         if (isHydration) {

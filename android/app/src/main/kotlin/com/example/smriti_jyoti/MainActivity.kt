@@ -115,8 +115,10 @@ class MainActivity : FlutterActivity() {
                     val yetToTakeLabel = call.argument<String>("yetToTakeLabel") ?: "Yet to Take"
                     val isHydration = call.argument<Boolean>("isHydration") ?: false
                     val showActions = call.argument<Boolean>("showActions") ?: true
+                    val medicineImagePath = call.argument<String>("medicineImagePath") ?: ""
+                    val pillsCount = call.argument<String>("pillsCount") ?: ""
 
-                    showSystemNotification(id, reminderId, title, body, takenLabel, yetToTakeLabel, isHydration, showActions)
+                    showSystemNotification(id, reminderId, title, body, takenLabel, yetToTakeLabel, isHydration, showActions, medicineImagePath, pillsCount)
                     result.success(true)
                 }
                 "requestPermission" -> {
@@ -141,9 +143,11 @@ class MainActivity : FlutterActivity() {
                     val langCode = call.argument<String>("langCode") ?: "en"
                     val isHydration = call.argument<Boolean>("isHydration") ?: false
                     val showActions = call.argument<Boolean>("showActions") ?: true
+                    val medicineImagePath = call.argument<String>("medicineImagePath") ?: ""
+                    val pillsCount = call.argument<String>("pillsCount") ?: ""
 
                     if (id != 0 && triggerAtMs > System.currentTimeMillis()) {
-                        scheduleNativeAlarm(id, triggerAtMs, title, body, reminderId, takenLabel, yetToTakeLabel, spokenText, fallbackText, customVoicePath, voiceMode, clonedVoiceSamplePath, langCode, isHydration, showActions)
+                        scheduleNativeAlarm(id, triggerAtMs, title, body, reminderId, takenLabel, yetToTakeLabel, spokenText, fallbackText, customVoicePath, voiceMode, clonedVoiceSamplePath, langCode, isHydration, showActions, medicineImagePath, pillsCount)
                     }
                     result.success(true)
                 }
@@ -258,7 +262,9 @@ class MainActivity : FlutterActivity() {
         clonedVoiceSamplePath: String,
         langCode: String,
         isHydration: Boolean,
-        showActions: Boolean = true
+        showActions: Boolean = true,
+        medicineImagePath: String = "",
+        pillsCount: String = ""
     ) {
         try {
             val isRoutine = reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine") ||
@@ -285,7 +291,7 @@ class MainActivity : FlutterActivity() {
             }
 
             val prefs = getSharedPreferences("aninai_native_alarms", Context.MODE_PRIVATE)
-            val valueStr = "$id|||$triggerAtMs|||$title|||$body|||$reminderId|||$finalTakenLabel|||$finalYetToTakeLabel|||$spokenText|||$langCode|||$isHydration|||$effectiveCustomVoicePath|||$effectiveVoiceMode|||$effectiveClonedVoiceSamplePath|||$fallbackText|||$showActions"
+            val valueStr = "$id|||$triggerAtMs|||$title|||$body|||$reminderId|||$finalTakenLabel|||$finalYetToTakeLabel|||$spokenText|||$langCode|||$isHydration|||$effectiveCustomVoicePath|||$effectiveVoiceMode|||$effectiveClonedVoiceSamplePath|||$fallbackText|||$showActions|||$medicineImagePath|||$pillsCount"
             prefs.edit().putString(id.toString(), valueStr).apply()
 
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
@@ -305,6 +311,8 @@ class MainActivity : FlutterActivity() {
                 putExtra("langCode", langCode)
                 putExtra("isHydration", isHydration)
                 putExtra("showActions", showActions)
+                putExtra("medicineImagePath", medicineImagePath)
+                putExtra("pillsCount", pillsCount)
             }
 
             val pendingIntent = PendingIntent.getBroadcast(
@@ -402,7 +410,9 @@ class MainActivity : FlutterActivity() {
         takenLabel: String,
         yetToTakeLabel: String,
         isHydration: Boolean,
-        showActions: Boolean = true
+        showActions: Boolean = true,
+        medicineImagePath: String = "",
+        pillsCount: String = ""
     ) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 

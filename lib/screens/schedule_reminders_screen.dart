@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/i18n_service.dart';
 import '../services/schedule_service.dart';
 import '../services/auth_service.dart';
@@ -29,6 +30,9 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  // Selected Date Filter for Reminders Calendar
  DateTime? _selectedFilterDate;
  int _selectedProgressDayIndex = DateTime.now().weekday - 1;
+
+ // Medicine Image Upload Path
+ String? _medicineImagePath;
 
  // Hydration Input Controller (starts empty, synced with ScheduleService)
  final _litersCtrl = TextEditingController();
@@ -322,6 +326,20 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  } catch (e) {
  debugPrint('Error playing preview grandson voice sample: $e');
  }
+ }
+ }
+
+ Future<void> _pickMedicineImageFromGallery() async {
+ try {
+ final picker = ImagePicker();
+ final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+ if (image != null) {
+ setState(() {
+ _medicineImagePath = image.path;
+ });
+ }
+ } catch (e) {
+ debugPrint('Error picking medicine image from gallery: $e');
  }
  }
 
@@ -1402,6 +1420,79 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  ),
  const SizedBox(height: 8),
 
+ // Gallery Medicine Image Picker Card
+ Container(
+ padding: const EdgeInsets.all(10),
+ decoration: BoxDecoration(
+ color: Colors.white,
+ borderRadius: BorderRadius.circular(12),
+ border: Border.all(color: const Color(0xFF61C5B0), width: 1.2),
+ ),
+ child: Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ Row(
+ children: [
+ const Icon(Icons.photo_library, color: Color(0xFF23B39B), size: 20),
+ const SizedBox(width: 8),
+ Expanded(
+ child: Text(
+ i18n.currentLang == 'ta' ? 'மருந்து படம் (கேலரி)' : 'Medicine Image (Gallery)',
+ style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+ ),
+ ),
+ ],
+ ),
+ const SizedBox(height: 8),
+ Row(
+ children: [
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF0284C7),
+ padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ icon: const Icon(Icons.upload_file, color: Colors.white, size: 18),
+ label: Text(
+ _medicineImagePath != null && File(_medicineImagePath!).existsSync()
+ ? (i18n.currentLang == 'ta' ? 'படம் மாற்று' : 'Change Image')
+ : (i18n.currentLang == 'ta' ? 'கேலரியில் இருந்து படம் தேர்வு செய்' : 'Select Image from Gallery'),
+ style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+ ),
+ onPressed: _pickMedicineImageFromGallery,
+ ),
+ ),
+ if (_medicineImagePath != null && File(_medicineImagePath!).existsSync()) ...[
+ const SizedBox(width: 8),
+ IconButton(
+ icon: const Icon(Icons.cancel, color: Colors.red),
+ onPressed: () {
+ setState(() {
+ _medicineImagePath = null;
+ });
+ },
+ ),
+ ],
+ ],
+ ),
+ if (_medicineImagePath != null && File(_medicineImagePath!).existsSync()) ...[
+ const SizedBox(height: 8),
+ ClipRRect(
+ borderRadius: BorderRadius.circular(10),
+ child: Image.file(
+ File(_medicineImagePath!),
+ height: 90,
+ width: 90,
+ fit: BoxFit.cover,
+ ),
+ ),
+ ],
+ ],
+ ),
+ ),
+ const SizedBox(height: 8),
+
  _buildVoiceRecorderCard(i18n),
  const SizedBox(height: 8),
 
@@ -1437,10 +1528,14 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  voiceMode: _voiceMode,
  clonedVoiceSamplePath: _voiceMode == 2 ? (_clonedVoiceSamplePath ?? '') : '',
  createdByRole: role,
+ medicineImagePath: _medicineImagePath ?? '',
  i18n: i18n,
  );
 
  _medNameCtrl.clear();
+ setState(() {
+ _medicineImagePath = null;
+ });
  ScaffoldMessenger.of(context).showSnackBar(
  SnackBar(content: Text('${i18n.translate("medAddedToast")}: $name ($time)')),
  );

@@ -347,6 +347,8 @@ class NotificationService {
     VoidCallback? onAction,
     VoidCallback? onTaken,
     VoidCallback? onYetToTake,
+    String medicineImagePath = '',
+    String pillsCount = '',
   }) async {
     final int notifId = DateTime.now().millisecondsSinceEpoch % 100000;
     final bool isRoutine = reminderId.startsWith('act_') ||
@@ -372,6 +374,8 @@ class NotificationService {
         'customVoicePath': effectiveCustomVoicePath,
         'voiceMode': effectiveVoiceMode,
         'clonedVoiceSamplePath': effectiveClonedVoiceSamplePath,
+        'medicineImagePath': medicineImagePath,
+        'pillsCount': pillsCount,
       });
     } catch (_) {}
 
@@ -413,6 +417,8 @@ class NotificationService {
     String langCode = 'en',
     bool isHydration = false,
     bool showActions = true,
+    String medicineImagePath = '',
+    String pillsCount = '',
   }) async {
     final bool isRoutine = reminderId.startsWith('act_') ||
         reminderId.contains('act') ||
@@ -441,6 +447,8 @@ class NotificationService {
         'langCode': langCode,
         'isHydration': isHydration,
         'showActions': showActions,
+        'medicineImagePath': medicineImagePath,
+        'pillsCount': pillsCount,
       });
     } catch (_) {}
   }

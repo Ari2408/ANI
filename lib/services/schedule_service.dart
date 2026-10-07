@@ -1287,6 +1287,8 @@ class ScheduleService extends ChangeNotifier {
  onAction: item.type == ReminderType.hydration ? () => logWaterGlass() : null,
  onTaken: () => markReminderTaken(item.id),
  onYetToTake: () => markReminderYetToTake(item.id),
+ medicineImagePath: item.medicineImagePath,
+ pillsCount: item.pillsCount,
  );
 
  if (attemptCount >= 4) {
@@ -1494,6 +1496,7 @@ class ScheduleService extends ChangeNotifier {
  int voiceMode = 0,
  String clonedVoiceSamplePath ='',
  String createdByRole ='caretaker',
+ String medicineImagePath ='',
  I18nService? i18n,
  }) {
  if (i18n != null) _i18n = i18n;
@@ -1512,6 +1515,7 @@ class ScheduleService extends ChangeNotifier {
  clonedVoiceSamplePath: clonedVoiceSamplePath,
  isCompleted: false,
  createdByRole: createdByRole,
+ medicineImagePath: medicineImagePath,
  );
  _reminders.insert(0, item);
  _scheduleReminderTimer(item, i18n: i18n);
@@ -1758,6 +1762,8 @@ class ScheduleService extends ChangeNotifier {
  langCode: langCode,
  isHydration: item.type == ReminderType.hydration,
  showActions: item.type == ReminderType.medicine || item.type == ReminderType.routine,
+ medicineImagePath: item.medicineImagePath,
+ pillsCount: item.pillsCount,
  );
  }
  }
