@@ -10,6 +10,15 @@ class I18nService extends ChangeNotifier {
 
  static final Map<String, Map<String, String>> _translations = {
 'en': {
+'weeklyProgressTitle':'Weekly Progress Showcase',
+'weeklyProgressSubtitle':'7-day completion tracking for daily medicine & routine reminders',
+'medicineAdherence':'Medicine Adherence',
+'routineAdherence':'Daily Routine Adherence',
+'overallWeeklyAdherence':'Overall Weekly Compliance',
+'dayWiseBreakdown':'Day-Wise Medicine & Routine Breakdown',
+'selectDayToView':'Tap any day above to view medicine compliance & details',
+'statusTaken':'Taken',
+'statusYetToTake':'Yet to Take',
 'todayNewsHeadlines':"Today's News Headlines",
 'fetchOnlineNewsSub':'Live online news & regional daily highlights',
 'readFullStory':'Read Full Story',

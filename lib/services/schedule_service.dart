@@ -580,6 +580,57 @@ class ScheduleService extends ChangeNotifier {
  Map<String, dynamic>? get activeNotification => _activeNotification;
  bool get isHydrationTimerActive => _hydrationTimer != null && _hydrationTimer!.isActive;
 
+ void toggleReminderCompletionForDay(String reminderId, int dayIndex) {
+ final index = _reminders.indexWhere((r) => r.id == reminderId);
+ if (index != -1) {
+ _reminders[index].toggleCompletionForDay(dayIndex);
+ saveSchedules();
+ notifyListeners();
+ }
+ }
+
+ Map<String, dynamic> getWeeklyProgressStats() {
+ final medReminders = _reminders.where((r) => r.type == ReminderType.medicine).toList();
+ final routineReminders = _reminders.where((r) => r.type == ReminderType.routine).toList();
+
+ final totalMeds = medReminders.length;
+ final todayDayIdx = DateTime.now().weekday - 1; // 0 = Mon, 6 = Sun
+ final completedMedsToday = medReminders.where((r) => r.isCompletedForDay(todayDayIdx)).length;
+ final int medPercentage = totalMeds == 0 ? 100 : ((completedMedsToday / totalMeds) * 100).round();
+
+ final totalRoutines = routineReminders.length;
+ final completedRoutinesToday = routineReminders.where((r) => r.isCompletedForDay(todayDayIdx)).length;
+ final int routinePercentage = totalRoutines == 0 ? 100 : ((completedRoutinesToday / totalRoutines) * 100).round();
+
+ final totalAll = totalMeds + totalRoutines;
+ final completedAll = completedMedsToday + completedRoutinesToday;
+ final int overallPercentage = totalAll == 0 ? 100 : ((completedAll / totalAll) * 100).round();
+
+ final List<double> medWeeklyBars = List.generate(7, (dayIdx) {
+ if (totalMeds == 0) return 0.0;
+ final completedOnDay = medReminders.where((r) => r.isCompletedForDay(dayIdx)).length;
+ return completedOnDay / totalMeds;
+ });
+
+ final List<double> routineWeeklyBars = List.generate(7, (dayIdx) {
+ if (totalRoutines == 0) return 0.0;
+ final completedOnDay = routineReminders.where((r) => r.isCompletedForDay(dayIdx)).length;
+ return completedOnDay / totalRoutines;
+ });
+
+ return {
+ 'totalMeds': totalMeds,
+ 'completedMeds': completedMedsToday,
+ 'medPercentage': medPercentage,
+ 'totalRoutines': totalRoutines,
+ 'completedRoutines': completedRoutinesToday,
+ 'routinePercentage': routinePercentage,
+ 'overallPercentage': overallPercentage,
+ 'medWeeklyBars': medWeeklyBars,
+ 'routineWeeklyBars': routineWeeklyBars,
+ };
+ }
+
  void updateI18n(I18nService i18n) {
  final langChanged = _i18n?.currentLang != i18n.currentLang;
  _i18n = i18n;

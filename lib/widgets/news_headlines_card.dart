@@ -192,7 +192,7 @@ class _NewsHeadlinesCardState extends State<NewsHeadlinesCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        i18n.translate('todayNewsHeadlines') ?? (isTamil ? 'இன்றைய முக்கிய செய்திகள்' : "Today's News Headlines"),
+                        i18n.translate('todayNewsHeadlines'),
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B2824)),
                         softWrap: true,
                       ),
@@ -220,7 +220,7 @@ class _NewsHeadlinesCardState extends State<NewsHeadlinesCard> {
                           : const Icon(Icons.refresh, size: 14, color: Color(0xFF1B4D3E)),
                       const SizedBox(width: 4),
                       Text(
-                        i18n.translate('refreshBtn') ?? (isTamil ? 'புதுப்பி' : 'Refresh'),
+                        i18n.translate('refreshBtn'),
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B4D3E)),
                       ),
                     ],
@@ -242,7 +242,7 @@ class _NewsHeadlinesCardState extends State<NewsHeadlinesCard> {
               ),
               const SizedBox(width: 6),
               Text(
-                i18n.translate('fetchOnlineNewsSub') ?? (isTamil ? 'நேரடி இணைய செய்திகள் & தமிழக செய்திகள்' : 'Online Live News & Regional Daily Highlights'),
+                i18n.translate('fetchOnlineNewsSub'),
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF5D4037)),
               ),
             ],
@@ -341,7 +341,7 @@ class _NewsHeadlinesCardState extends State<NewsHeadlinesCard> {
                         InkWell(
                           onTap: () => _showNewsDetailsModal(context, item, i18n),
                           child: Text(
-                            i18n.translate('readFullStory') ?? 'Read Full Story',
+                            i18n.translate('readFullStory'),
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF23B39B)),
                           ),
                         ),
