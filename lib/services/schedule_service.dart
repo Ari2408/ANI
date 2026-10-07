@@ -1553,6 +1553,7 @@ class ScheduleService extends ChangeNotifier {
  int voiceMode = 0,
  String clonedVoiceSamplePath ='',
  String createdByRole ='caretaker',
+ String medicineImagePath ='',
  I18nService? i18n,
  }) {
  if (i18n != null) _i18n = i18n;
@@ -1568,6 +1569,7 @@ class ScheduleService extends ChangeNotifier {
  clonedVoiceSamplePath:'',
  isCompleted: false,
  createdByRole: createdByRole,
+ medicineImagePath: medicineImagePath,
  );
  _reminders.insert(0, item);
  _scheduleReminderTimer(item, i18n: i18n);
@@ -1583,6 +1585,7 @@ class ScheduleService extends ChangeNotifier {
  int voiceMode = 0,
  String clonedVoiceSamplePath ='',
  String createdByRole ='caretaker',
+ String medicineImagePath ='',
  I18nService? i18n,
  }) {
  if (i18n != null) _i18n = i18n;
@@ -1598,6 +1601,7 @@ class ScheduleService extends ChangeNotifier {
  clonedVoiceSamplePath: clonedVoiceSamplePath,
  isCompleted: false,
  createdByRole: createdByRole,
+ medicineImagePath: medicineImagePath,
  );
  _reminders.insert(0, item);
  _scheduleReminderTimer(item, i18n: i18n);

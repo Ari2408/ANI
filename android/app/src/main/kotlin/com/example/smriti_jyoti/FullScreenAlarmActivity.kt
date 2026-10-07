@@ -93,23 +93,30 @@ class FullScreenAlarmActivity : Activity() {
 
         val isRoutine = reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine") ||
                 title.contains("Daily Activity") || title.contains("தினசரி") || title.contains("dinasari")
+        val isAppt = reminderId.startsWith("apt_") || reminderId.contains("apt") || reminderId.contains("appointment") ||
+                title.contains("Appointment") || title.contains("சந்திப்பு") || title.contains("sandhippu") || title.contains("Doctor")
+        val disableAnimation = isRoutine || isAppt
 
-        val takenLabel = if (rawTakenLabel.isNotEmpty() && rawTakenLabel != "takenBtn" && rawTakenLabel != "startedBtn") {
+        val takenLabel = if (rawTakenLabel.isNotEmpty() && rawTakenLabel != "takenBtn" && rawTakenLabel != "startedBtn" && rawTakenLabel != "attendedBtn") {
             rawTakenLabel
         } else if (isHydration) {
             if (langCode == "ta") "💧 1 டம்ளர் தண்ணீர் பதிவுசெய்" else "💧 Log 1 Glass Water"
         } else if (isRoutine) {
             if (langCode == "ta") "✅ தொடங்கப்பட்டது" else "✅ Started"
+        } else if (isAppt) {
+            if (langCode == "ta") "✅ சென்றேன்" else "✅ Attended"
         } else {
             if (langCode == "ta") "✅ எடுத்துக்கொண்டேன்" else "✅ Taken"
         }
 
-        val yetToTakeLabel = if (rawYetToTakeLabel.isNotEmpty() && rawYetToTakeLabel != "yetToTakeBtn" && rawYetToTakeLabel != "notStartedBtn") {
+        val yetToTakeLabel = if (rawYetToTakeLabel.isNotEmpty() && rawYetToTakeLabel != "yetToTakeBtn" && rawYetToTakeLabel != "notStartedBtn" && rawYetToTakeLabel != "notAttendedBtn") {
             rawYetToTakeLabel
         } else if (isHydration) {
             if (langCode == "ta") "⏰ பின்னர் நினைவூட்டு" else "⏰ Remind Later"
         } else if (isRoutine) {
             if (langCode == "ta") "⏳ தொடங்கவில்லை" else "⏳ Not Started"
+        } else if (isAppt) {
+            if (langCode == "ta") "⏳ செல்லவில்லை" else "⏳ Not Attended"
         } else {
             if (langCode == "ta") "⏳ எடுக்கவில்லை" else "⏳ Yet to Take"
         }
@@ -133,23 +140,25 @@ class FullScreenAlarmActivity : Activity() {
         }
 
         // Animated Background Evaluator
-        val colorStart = Color.parseColor("#0D1B2A")
-        val colorMid = Color.parseColor("#1E3A8A")
-        val colorEnd = Color.parseColor("#311B92")
+        if (!disableAnimation) {
+            val colorStart = Color.parseColor("#0D1B2A")
+            val colorMid = Color.parseColor("#1E3A8A")
+            val colorEnd = Color.parseColor("#311B92")
 
-        bgAnimator = ValueAnimator.ofObject(ArgbEvaluator(), colorStart, colorMid, colorEnd, colorStart).apply {
-            duration = 4000
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            addUpdateListener { anim ->
-                val current = anim.animatedValue as Int
-                val animatedGrad = GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    intArrayOf(current, Color.parseColor("#1B263B"), Color.parseColor("#0F172A"))
-                )
-                rootLayout.background = animatedGrad
+            bgAnimator = ValueAnimator.ofObject(ArgbEvaluator(), colorStart, colorMid, colorEnd, colorStart).apply {
+                duration = 4000
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.REVERSE
+                addUpdateListener { anim ->
+                    val current = anim.animatedValue as Int
+                    val animatedGrad = GradientDrawable(
+                        GradientDrawable.Orientation.TOP_BOTTOM,
+                        intArrayOf(current, Color.parseColor("#1B263B"), Color.parseColor("#0F172A"))
+                    )
+                    rootLayout.background = animatedGrad
+                }
+                start()
             }
-            start()
         }
 
         // 7. Icon Badge Container with Pulsing Glow Ring
@@ -175,7 +184,7 @@ class FullScreenAlarmActivity : Activity() {
         iconContainer.addView(ringView)
 
         val iconBadge = TextView(this).apply {
-            text = if (isHydration) "💧" else if (isRoutine) "🏃‍♂️" else "💊"
+            text = if (isHydration) "💧" else if (isRoutine) "🏃‍♂️" else if (isAppt) "🏥" else "💊"
             textSize = 72f
             gravity = Gravity.CENTER
             layoutParams = FrameLayout.LayoutParams(
@@ -218,7 +227,7 @@ class FullScreenAlarmActivity : Activity() {
 
         // Display Pills Count Badge on Lock Screen
         val effectivePills = if (pillsCount.isNotEmpty()) pillsCount else ""
-        if (effectivePills.isNotEmpty() || (!isRoutine && !isHydration)) {
+        if (effectivePills.isNotEmpty() || (!isRoutine && !isAppt && !isHydration)) {
             val pillsBadgeText = if (effectivePills.isNotEmpty()) {
                 if (langCode == "ta") "💊 மாத்திரைகளின் எண்ணிக்கை: $effectivePills" else "💊 Number of Pills: $effectivePills"
             } else {
@@ -250,30 +259,32 @@ class FullScreenAlarmActivity : Activity() {
         }
 
         // Pulsing Icon & Ring Animations
-        val iconScaleX = ObjectAnimator.ofFloat(iconBadge, View.SCALE_X, 1.0f, 1.22f, 1.0f)
-        val iconScaleY = ObjectAnimator.ofFloat(iconBadge, View.SCALE_Y, 1.0f, 1.22f, 1.0f)
-        iconScaleX.repeatCount = ValueAnimator.INFINITE
-        iconScaleY.repeatCount = ValueAnimator.INFINITE
+        if (!disableAnimation) {
+            val iconScaleX = ObjectAnimator.ofFloat(iconBadge, View.SCALE_X, 1.0f, 1.22f, 1.0f)
+            val iconScaleY = ObjectAnimator.ofFloat(iconBadge, View.SCALE_Y, 1.0f, 1.22f, 1.0f)
+            iconScaleX.repeatCount = ValueAnimator.INFINITE
+            iconScaleY.repeatCount = ValueAnimator.INFINITE
 
-        iconAnimatorSet = AnimatorSet().apply {
-            playTogether(iconScaleX, iconScaleY)
-            duration = 1400
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
-        }
+            iconAnimatorSet = AnimatorSet().apply {
+                playTogether(iconScaleX, iconScaleY)
+                duration = 1400
+                interpolator = AccelerateDecelerateInterpolator()
+                start()
+            }
 
-        val ringScaleX = ObjectAnimator.ofFloat(ringView, View.SCALE_X, 0.95f, 1.45f, 0.95f)
-        val ringScaleY = ObjectAnimator.ofFloat(ringView, View.SCALE_Y, 0.95f, 1.45f, 0.95f)
-        val ringAlpha = ObjectAnimator.ofFloat(ringView, View.ALPHA, 0.6f, 0.1f, 0.6f)
-        ringScaleX.repeatCount = ValueAnimator.INFINITE
-        ringScaleY.repeatCount = ValueAnimator.INFINITE
-        ringAlpha.repeatCount = ValueAnimator.INFINITE
+            val ringScaleX = ObjectAnimator.ofFloat(ringView, View.SCALE_X, 0.95f, 1.45f, 0.95f)
+            val ringScaleY = ObjectAnimator.ofFloat(ringView, View.SCALE_Y, 0.95f, 1.45f, 0.95f)
+            val ringAlpha = ObjectAnimator.ofFloat(ringView, View.ALPHA, 0.6f, 0.1f, 0.6f)
+            ringScaleX.repeatCount = ValueAnimator.INFINITE
+            ringScaleY.repeatCount = ValueAnimator.INFINITE
+            ringAlpha.repeatCount = ValueAnimator.INFINITE
 
-        ringAnimatorSet = AnimatorSet().apply {
-            playTogether(ringScaleX, ringScaleY, ringAlpha)
-            duration = 1400
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
+            ringAnimatorSet = AnimatorSet().apply {
+                playTogether(ringScaleX, ringScaleY, ringAlpha)
+                duration = 1400
+                interpolator = AccelerateDecelerateInterpolator()
+                start()
+            }
         }
 
         // 8. Reminder Title with Animated Slide-Up
@@ -284,8 +295,8 @@ class FullScreenAlarmActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             setPadding(0, 16, 0, 16)
-            alpha = 0f
-            translationY = 60f
+            alpha = if (disableAnimation) 1f else 0f
+            translationY = if (disableAnimation) 0f else 60f
         }
         rootLayout.addView(titleTv)
 
@@ -296,8 +307,8 @@ class FullScreenAlarmActivity : Activity() {
             setTextColor(Color.parseColor("#CBD5E1"))
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 40)
-            alpha = 0f
-            translationY = 60f
+            alpha = if (disableAnimation) 1f else 0f
+            translationY = if (disableAnimation) 0f else 60f
         }
         rootLayout.addView(bodyTv)
 
@@ -308,8 +319,8 @@ class FullScreenAlarmActivity : Activity() {
             setTextColor(Color.parseColor("#FBBF24"))
             gravity = Gravity.CENTER
             setPadding(0, 8, 0, 48)
-            alpha = 0f
-            translationY = 60f
+            alpha = if (disableAnimation) 1f else 0f
+            translationY = if (disableAnimation) 0f else 60f
         }
         rootLayout.addView(noticeTv)
 
@@ -321,8 +332,8 @@ class FullScreenAlarmActivity : Activity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            alpha = 0f
-            translationY = 80f
+            alpha = if (disableAnimation) 1f else 0f
+            translationY = if (disableAnimation) 0f else 80f
         }
 
         // Option 1 Button (Green / Taken)
@@ -377,22 +388,24 @@ class FullScreenAlarmActivity : Activity() {
         setContentView(scrollView)
 
         // 12. Entrance Staggered Slide-In Animations
-        titleTv.animate().alpha(1f).translationY(0f).setDuration(600).setStartDelay(200).setInterpolator(OvershootInterpolator(1.2f)).start()
-        bodyTv.animate().alpha(1f).translationY(0f).setDuration(600).setStartDelay(350).start()
-        noticeTv.animate().alpha(1f).translationY(0f).setDuration(600).setStartDelay(450).start()
-        buttonLayout.animate().alpha(1f).translationY(0f).setDuration(700).setStartDelay(600).setInterpolator(OvershootInterpolator(1.1f)).start()
+        if (!disableAnimation) {
+            titleTv.animate().alpha(1f).translationY(0f).setDuration(600).setStartDelay(200).setInterpolator(OvershootInterpolator(1.2f)).start()
+            bodyTv.animate().alpha(1f).translationY(0f).setDuration(600).setStartDelay(350).start()
+            noticeTv.animate().alpha(1f).translationY(0f).setDuration(600).setStartDelay(450).start()
+            buttonLayout.animate().alpha(1f).translationY(0f).setDuration(700).setStartDelay(600).setInterpolator(OvershootInterpolator(1.1f)).start()
 
-        // 13. Subtle Continuous Pulse on Option 1 Button
-        val btnScaleX = ObjectAnimator.ofFloat(btnTaken, View.SCALE_X, 1.0f, 1.03f, 1.0f)
-        val btnScaleY = ObjectAnimator.ofFloat(btnTaken, View.SCALE_Y, 1.0f, 1.03f, 1.0f)
-        btnScaleX.repeatCount = ValueAnimator.INFINITE
-        btnScaleY.repeatCount = ValueAnimator.INFINITE
+            // 13. Subtle Continuous Pulse on Option 1 Button
+            val btnScaleX = ObjectAnimator.ofFloat(btnTaken, View.SCALE_X, 1.0f, 1.03f, 1.0f)
+            val btnScaleY = ObjectAnimator.ofFloat(btnTaken, View.SCALE_Y, 1.0f, 1.03f, 1.0f)
+            btnScaleX.repeatCount = ValueAnimator.INFINITE
+            btnScaleY.repeatCount = ValueAnimator.INFINITE
 
-        btnPulseAnimatorSet = AnimatorSet().apply {
-            playTogether(btnScaleX, btnScaleY)
-            duration = 1200
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
+            btnPulseAnimatorSet = AnimatorSet().apply {
+                playTogether(btnScaleX, btnScaleY)
+                duration = 1200
+                interpolator = AccelerateDecelerateInterpolator()
+                start()
+            }
         }
     }
 

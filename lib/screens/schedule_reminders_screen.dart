@@ -31,8 +31,10 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  DateTime? _selectedFilterDate;
  int _selectedProgressDayIndex = DateTime.now().weekday - 1;
 
- // Medicine Image Upload Path
+ // Medicine, Appointment & Activity Image Upload Paths
  String? _medicineImagePath;
+ String? _aptImagePath;
+ String? _actImagePath;
 
  // Hydration Input Controller (starts empty, synced with ScheduleService)
  final _litersCtrl = TextEditingController();
@@ -340,6 +342,34 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  }
  } catch (e) {
  debugPrint('Error picking medicine image from gallery: $e');
+ }
+ }
+
+ Future<void> _pickAppointmentImageFromGallery() async {
+ try {
+ final picker = ImagePicker();
+ final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+ if (image != null) {
+ setState(() {
+ _aptImagePath = image.path;
+ });
+ }
+ } catch (e) {
+ debugPrint('Error picking appointment image from gallery: $e');
+ }
+ }
+
+ Future<void> _pickActivityImageFromGallery() async {
+ try {
+ final picker = ImagePicker();
+ final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+ if (image != null) {
+ setState(() {
+ _actImagePath = image.path;
+ });
+ }
+ } catch (e) {
+ debugPrint('Error picking activity image from gallery: $e');
  }
  }
 
@@ -1610,6 +1640,79 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
  ),
  ),
+ const SizedBox(height: 8),
+
+ // Gallery Appointment Image Picker Card
+ Container(
+ padding: const EdgeInsets.all(10),
+ decoration: BoxDecoration(
+ color: Colors.white,
+ borderRadius: BorderRadius.circular(12),
+ border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+ ),
+ child: Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ Row(
+ children: [
+ const Icon(Icons.photo_library, color: Color(0xFFF59E0B), size: 20),
+ const SizedBox(width: 8),
+ Expanded(
+ child: Text(
+ i18n.currentLang == 'ta' ? 'மருத்துவ ஆலோசனை படம் (கேலரி)' : 'Appointment Image (Gallery)',
+ style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+ ),
+ ),
+ ],
+ ),
+ const SizedBox(height: 8),
+ Row(
+ children: [
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF0284C7),
+ padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ icon: const Icon(Icons.upload_file, color: Colors.white, size: 18),
+ label: Text(
+ _aptImagePath != null && File(_aptImagePath!).existsSync()
+ ? (i18n.currentLang == 'ta' ? 'படம் மாற்று' : 'Change Image')
+ : (i18n.currentLang == 'ta' ? 'கேலரியில் இருந்து படம் தேர்வு செய்' : 'Select Image from Gallery'),
+ style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+ ),
+ onPressed: _pickAppointmentImageFromGallery,
+ ),
+ ),
+ if (_aptImagePath != null && File(_aptImagePath!).existsSync()) ...[
+ const SizedBox(width: 8),
+ IconButton(
+ icon: const Icon(Icons.cancel, color: Colors.red),
+ onPressed: () {
+ setState(() {
+ _aptImagePath = null;
+ });
+ },
+ ),
+ ],
+ ],
+ ),
+ if (_aptImagePath != null && File(_aptImagePath!).existsSync()) ...[
+ const SizedBox(height: 8),
+ ClipRRect(
+ borderRadius: BorderRadius.circular(10),
+ child: Image.file(
+ File(_aptImagePath!),
+ height: 90,
+ width: 90,
+ fit: BoxFit.cover,
+ ),
+ ),
+ ],
+ ],
+ ),
+ ),
  const SizedBox(height: 10),
 
  SizedBox(
@@ -1643,11 +1746,15 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  voiceMode: 0,
  clonedVoiceSamplePath: '',
  createdByRole: role,
+ medicineImagePath: _aptImagePath ?? '',
  i18n: i18n,
  );
 
  _aptTitleCtrl.clear();
  _aptLocationCtrl.clear();
+ setState(() {
+ _aptImagePath = null;
+ });
  ScaffoldMessenger.of(context).showSnackBar(
  SnackBar(content: Text('${i18n.translate("apptAddedToast")}: $title ($dateTime)')),
  );
@@ -1733,6 +1840,79 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  _buildVoiceRecorderCard(i18n, showGrandsonOption: false),
  const SizedBox(height: 8),
 
+ // Gallery Activity Image Picker Card
+ Container(
+ padding: const EdgeInsets.all(10),
+ decoration: BoxDecoration(
+ color: Colors.white,
+ borderRadius: BorderRadius.circular(12),
+ border: Border.all(color: const Color(0xFF61C5B0), width: 1.2),
+ ),
+ child: Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ Row(
+ children: [
+ const Icon(Icons.photo_library, color: Color(0xFF61C5B0), size: 20),
+ const SizedBox(width: 8),
+ Expanded(
+ child: Text(
+ i18n.currentLang == 'ta' ? 'செயல்பாடு படம் (கேலரி)' : 'Routine Image (Gallery)',
+ style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+ ),
+ ),
+ ],
+ ),
+ const SizedBox(height: 8),
+ Row(
+ children: [
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF0284C7),
+ padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ icon: const Icon(Icons.upload_file, color: Colors.white, size: 18),
+ label: Text(
+ _actImagePath != null && File(_actImagePath!).existsSync()
+ ? (i18n.currentLang == 'ta' ? 'படம் மாற்று' : 'Change Image')
+ : (i18n.currentLang == 'ta' ? 'கேலரியில் இருந்து படம் தேர்வு செய்' : 'Select Image from Gallery'),
+ style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+ ),
+ onPressed: _pickActivityImageFromGallery,
+ ),
+ ),
+ if (_actImagePath != null && File(_actImagePath!).existsSync()) ...[
+ const SizedBox(width: 8),
+ IconButton(
+ icon: const Icon(Icons.cancel, color: Colors.red),
+ onPressed: () {
+ setState(() {
+ _actImagePath = null;
+ });
+ },
+ ),
+ ],
+ ],
+ ),
+ if (_actImagePath != null && File(_actImagePath!).existsSync()) ...[
+ const SizedBox(height: 8),
+ ClipRRect(
+ borderRadius: BorderRadius.circular(10),
+ child: Image.file(
+ File(_actImagePath!),
+ height: 90,
+ width: 90,
+ fit: BoxFit.cover,
+ ),
+ ),
+ ],
+ ],
+ ),
+ ),
+ const SizedBox(height: 8),
+
  SizedBox(
  width: double.infinity,
  child: ElevatedButton.icon(
@@ -1764,11 +1944,15 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  voiceMode: 1,
  clonedVoiceSamplePath: '',
  createdByRole: role,
+ medicineImagePath: _actImagePath ?? '',
  i18n: i18n,
  );
 
  _actTitleCtrl.clear();
  _actDetailsCtrl.clear();
+ setState(() {
+ _actImagePath = null;
+ });
  ScaffoldMessenger.of(context).showSnackBar(
  SnackBar(content: Text('${i18n.translate("actAddedToast")}: $title ($time)')),
  );
