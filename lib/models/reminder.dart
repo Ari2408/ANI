@@ -19,6 +19,9 @@ class ReminderItem {
   int reminderAttempt; // 1 = 1st reminder, 2 = 2nd reminder, 3 = 3rd reminder
   final String createdByRole; // 'elder' or 'caretaker'
   final String medicineImagePath;
+  final String repeatOption; // 'daily', 'weekdays', 'alternate', 'custom'
+  final List<int> selectedDays; // 0 = Mon, 1 = Tue, ..., 6 = Sun
+  final String startDate; // YYYY-MM-DD for tracking alternate day intervals
 
   ReminderItem({
     required this.id,
@@ -36,7 +39,12 @@ class ReminderItem {
     this.reminderAttempt = 1,
     this.createdByRole = 'caretaker',
     this.medicineImagePath = '',
-  }) : completedDays = completedDays ?? (isCompleted ? [DateTime.now().weekday - 1] : []);
+    this.repeatOption = 'daily',
+    List<int>? selectedDays,
+    String? startDate,
+  })  : completedDays = completedDays ?? (isCompleted ? [DateTime.now().weekday - 1] : []),
+        selectedDays = selectedDays ?? [0, 1, 2, 3, 4, 5, 6],
+        startDate = startDate ?? DateTime.now().toIso8601String().split('T')[0];
 
   bool isCompletedForDay(int dayIndex) {
     return completedDays.contains(dayIndex);
@@ -67,6 +75,9 @@ class ReminderItem {
         'reminderAttempt': reminderAttempt,
         'createdByRole': createdByRole,
         'medicineImagePath': medicineImagePath,
+        'repeatOption': repeatOption,
+        'selectedDays': selectedDays,
+        'startDate': startDate,
       };
 
   factory ReminderItem.fromJson(Map<String, dynamic> json) {
@@ -138,6 +149,14 @@ class ReminderItem {
       parsedCompletedDays = [DateTime.now().weekday - 1];
     }
 
+    final rawRepeatOption = (json['repeatOption'] ?? 'daily').toString();
+    final rawSelectedDays = json['selectedDays'];
+    List<int> parsedSelectedDays = [0, 1, 2, 3, 4, 5, 6];
+    if (rawSelectedDays is List) {
+      parsedSelectedDays = rawSelectedDays.map((e) => (e as num).toInt()).toList();
+    }
+    final rawStartDate = (json['startDate'] ?? DateTime.now().toIso8601String().split('T')[0]).toString();
+
     return ReminderItem(
       id: idStr,
       type: finalType,
@@ -154,6 +173,9 @@ class ReminderItem {
       reminderAttempt: json['reminderAttempt'] is int ? json['reminderAttempt'] as int : 1,
       createdByRole: json['createdByRole'] ?? 'caretaker',
       medicineImagePath: json['medicineImagePath'] ?? '',
+      repeatOption: rawRepeatOption,
+      selectedDays: parsedSelectedDays,
+      startDate: rawStartDate,
     );
   }
 

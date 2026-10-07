@@ -753,55 +753,107 @@ class ScheduleService extends ChangeNotifier {
  }
  }
 
- /// Parses 12-hour (e.g."08:00 AM","8:30 PM") and 24-hour ("14:30") strings into a target DateTime
+ /// Parses 12-hour (e.g. "08:00 AM", "8:30 PM") and 24-hour ("14:30") strings into a base DateTime
  DateTime? parseScheduledTimeToDateTime(String timeStr) {
  final now = DateTime.now();
  final timeUpper = timeStr.trim().toUpperCase();
 
- // 1. Try 12-Hour format with AM/PM (e.g.,"08:00 AM","8:30 PM","11:15 AM","12:00 PM")
+ int? hour;
+ int? minute;
+
  final reg12 = RegExp(r'(\d{1,2}):(\d{2})\s*(AM|PM)');
  final match12 = reg12.firstMatch(timeUpper);
  if (match12 != null) {
- int hour = int.parse(match12.group(1) ??'0');
- final minute = int.parse(match12.group(2) ??'0');
- final isPm = match12.group(3) =='PM';
-
+ hour = int.parse(match12.group(1) ?? '0');
+ minute = int.parse(match12.group(2) ?? '0');
+ final isPm = match12.group(3) == 'PM';
  if (hour == 12) {
  hour = isPm ? 12 : 0;
  } else if (isPm) {
  hour += 12;
  }
-
- var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
- // If the target time for today has passed by more than 1 minute, schedule for tomorrow
- if (scheduledDate.isBefore(now.subtract(const Duration(minutes: 1)))) {
- scheduledDate = scheduledDate.add(const Duration(days: 1));
- }
- return scheduledDate;
- }
-
- // 2. Try 24-Hour format (e.g.,"14:30","08:00")
+ } else {
  final reg24 = RegExp(r'(\d{1,2}):(\d{2})');
  final match24 = reg24.firstMatch(timeUpper);
  if (match24 != null) {
- final hour = int.parse(match24.group(1) ??'0');
- final minute = int.parse(match24.group(2) ??'0');
+ hour = int.parse(match24.group(1) ?? '0');
+ minute = int.parse(match24.group(2) ?? '0');
+ }
+ }
 
+ if (hour == null || minute == null) return null;
+
+ return DateTime(now.year, now.month, now.day, hour, minute);
+ }
+
+ /// Calculates the exact next target DateTime based on ReminderItem repeatOption & selectedDays
+ DateTime? calculateNextScheduledDate(ReminderItem item) {
+ final now = DateTime.now();
+ final baseTarget = parseScheduledTimeToDateTime(item.time);
+ if (baseTarget == null) return null;
+
+ final hour = baseTarget.hour;
+ final minute = baseTarget.minute;
+
+ final option = item.repeatOption;
+ final selectedDays = item.selectedDays;
+
+ if (option == 'weekdays') {
+ for (int i = 0; i <= 7; i++) {
+ final candidateDate = now.add(Duration(days: i));
+ final dayOfWeekIndex = candidateDate.weekday - 1; // 0 = Mon, ..., 6 = Sun
+ if (dayOfWeekIndex >= 0 && dayOfWeekIndex <= 4) { // Mon..Fri
+ final target = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
+ if (target.isAfter(now)) {
+ return target;
+ }
+ }
+ }
+ } else if (option == 'alternate') {
+ DateTime start;
+ try {
+ start = DateTime.parse(item.startDate);
+ } catch (_) {
+ start = DateTime(now.year, now.month, now.day);
+ }
+ final cleanStart = DateTime(start.year, start.month, start.day);
+
+ for (int i = 0; i <= 30; i++) {
+ final candidateDate = DateTime(now.year, now.month, now.day).add(Duration(days: i));
+ final diffDays = candidateDate.difference(cleanStart).inDays.abs();
+ if (diffDays % 2 == 0) {
+ final target = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
+ if (target.isAfter(now)) {
+ return target;
+ }
+ }
+ }
+ } else if (option == 'custom' && selectedDays.isNotEmpty) {
+ for (int i = 0; i <= 7; i++) {
+ final candidateDate = now.add(Duration(days: i));
+ final dayOfWeekIndex = candidateDate.weekday - 1; // 0 = Mon, ..., 6 = Sun
+ if (selectedDays.contains(dayOfWeekIndex)) {
+ final target = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
+ if (target.isAfter(now)) {
+ return target;
+ }
+ }
+ }
+ }
+
+ // Default 'daily' or fallback:
  var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
  if (scheduledDate.isBefore(now.subtract(const Duration(minutes: 1)))) {
  scheduledDate = scheduledDate.add(const Duration(days: 1));
  }
  return scheduledDate;
- }
-
- return null;
  }
 
  void _scheduleReminderTimer(ReminderItem item, {I18nService? i18n}) {
  _scheduledTimers[item.id]?.cancel();
  if (isCaretakerMode) return;
 
- final targetDate = parseScheduledTimeToDateTime(item.time);
+ final targetDate = calculateNextScheduledDate(item);
  if (targetDate != null) {
  final delay = targetDate.difference(DateTime.now());
  if (delay.inSeconds > 0) {
@@ -1491,17 +1543,20 @@ class ScheduleService extends ChangeNotifier {
  required String medicineName,
  required String pillsCount,
  required String time,
- String instructions ='Take with water',
- String customVoicePath ='',
+ String instructions = 'Take with water',
+ String customVoicePath = '',
  int voiceMode = 0,
- String clonedVoiceSamplePath ='',
- String createdByRole ='caretaker',
- String medicineImagePath ='',
+ String clonedVoiceSamplePath = '',
+ String createdByRole = 'caretaker',
+ String medicineImagePath = '',
+ String repeatOption = 'daily',
+ List<int>? selectedDays,
+ String? startDate,
  I18nService? i18n,
  }) {
  if (i18n != null) _i18n = i18n;
- final newId ='med_${DateTime.now().millisecondsSinceEpoch}';
- final detailText ='$pillsCount pill(s)${instructions.isNotEmpty ?"• $instructions":""}';
+ final newId = 'med_${DateTime.now().millisecondsSinceEpoch}';
+ final detailText = '$pillsCount pill(s)${instructions.isNotEmpty ?"• $instructions":""}';
  final item = ReminderItem(
  id: newId,
  type: ReminderType.medicine,
@@ -1516,11 +1571,67 @@ class ScheduleService extends ChangeNotifier {
  isCompleted: false,
  createdByRole: createdByRole,
  medicineImagePath: medicineImagePath,
+ repeatOption: repeatOption,
+ selectedDays: selectedDays ?? [0, 1, 2, 3, 4, 5, 6],
+ startDate: startDate ?? DateTime.now().toIso8601String().split('T')[0],
  );
  _reminders.insert(0, item);
  _scheduleReminderTimer(item, i18n: i18n);
  saveSchedules();
  speakScheduledVoiceSuccess(customVoicePath: customVoicePath, voiceMode: voiceMode, clonedVoiceSamplePath: clonedVoiceSamplePath);
+ }
+
+ /// Updates an existing medicine reminder by ID and recalculates its repeat schedule & alarm
+ void updateMedicineReminder({
+ required String id,
+ required String medicineName,
+ required String pillsCount,
+ required String time,
+ String instructions = 'Take with water',
+ String customVoicePath = '',
+ int voiceMode = 0,
+ String clonedVoiceSamplePath = '',
+ String createdByRole = 'caretaker',
+ String medicineImagePath = '',
+ String repeatOption = 'daily',
+ List<int>? selectedDays,
+ String? startDate,
+ I18nService? i18n,
+ }) {
+ if (i18n != null) _i18n = i18n;
+ final index = _reminders.indexWhere((r) => r.id == id);
+ if (index == -1) return;
+
+ final existingItem = _reminders[index];
+ final detailText = '$pillsCount pill(s)${instructions.isNotEmpty ? " • $instructions" : ""}';
+ final updatedItem = ReminderItem(
+ id: id,
+ type: existingItem.type,
+ title: medicineName,
+ time: time,
+ detail: detailText,
+ pillsCount: pillsCount,
+ instructions: instructions,
+ customVoicePath: customVoicePath,
+ voiceMode: voiceMode,
+ clonedVoiceSamplePath: clonedVoiceSamplePath,
+ isCompleted: existingItem.isCompleted,
+ completedDays: existingItem.completedDays,
+ reminderAttempt: existingItem.reminderAttempt,
+ createdByRole: createdByRole,
+ medicineImagePath: medicineImagePath,
+ repeatOption: repeatOption,
+ selectedDays: selectedDays ?? existingItem.selectedDays,
+ startDate: startDate ?? existingItem.startDate,
+ );
+
+ _scheduledTimers[id]?.cancel();
+ _scheduledTimers.remove(id);
+ NotificationService.cancelAlarm(id.hashCode.abs() % 100000);
+
+ _reminders[index] = updatedItem;
+ _scheduleReminderTimer(updatedItem, i18n: i18n);
+ saveSchedules();
  }
 
  void addMedicineRoutine({
