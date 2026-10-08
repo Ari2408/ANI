@@ -117,8 +117,9 @@ class MainActivity : FlutterActivity() {
                     val showActions = call.argument<Boolean>("showActions") ?: true
                     val medicineImagePath = call.argument<String>("medicineImagePath") ?: ""
                     val pillsCount = call.argument<String>("pillsCount") ?: ""
+                    val langCode = call.argument<String>("langCode") ?: "en"
 
-                    showSystemNotification(id, reminderId, title, body, takenLabel, yetToTakeLabel, isHydration, showActions, medicineImagePath, pillsCount)
+                    showSystemNotification(id, reminderId, title, body, takenLabel, yetToTakeLabel, isHydration, showActions, medicineImagePath, pillsCount, langCode)
                     result.success(true)
                 }
                 "requestPermission" -> {
@@ -416,7 +417,8 @@ class MainActivity : FlutterActivity() {
         isHydration: Boolean,
         showActions: Boolean = true,
         medicineImagePath: String = "",
-        pillsCount: String = ""
+        pillsCount: String = "",
+        langCode: String = "en"
     ) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -431,6 +433,21 @@ class MainActivity : FlutterActivity() {
             PendingIntent.FLAG_UPDATE_CURRENT
         }
         val pendingIntent = PendingIntent.getActivity(this, id, intent, activityFlags)
+
+        val fullScreenIntent = Intent(this, FullScreenAlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            putExtra("notificationId", id)
+            putExtra("reminderId", reminderId)
+            putExtra("title", title)
+            putExtra("body", body)
+            putExtra("takenLabel", takenLabel)
+            putExtra("yetToTakeLabel", yetToTakeLabel)
+            putExtra("isHydration", isHydration)
+            putExtra("langCode", langCode)
+            putExtra("medicineImagePath", medicineImagePath)
+            putExtra("pillsCount", pillsCount)
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(this, id * 10 + 9, fullScreenIntent, activityFlags)
 
         val broadcastFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -466,11 +483,15 @@ class MainActivity : FlutterActivity() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setVibrate(longArrayOf(0, 500, 250, 500))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
+
+        if (!isHydration && reminderId != "hyd") {
+            builder.setFullScreenIntent(fullScreenPendingIntent, true)
+        }
 
         val isAppointment = isAppointmentReminder(reminderId, title, body)
         if (isHydration) {

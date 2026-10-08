@@ -188,9 +188,9 @@ class AlarmReceiver : BroadcastReceiver() {
                     val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
                     val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, piFlags)
                     try {
-                        fullScreenPendingIntent.send()
-                    } catch (_: Exception) {
                         context.startActivity(fullScreenIntent)
+                    } catch (e: Exception) {
+                        fullScreenPendingIntent.send()
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("AninaiAlarm", "Error launching FullScreenAlarmActivity directly", e)
@@ -839,7 +839,7 @@ class AlarmReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setVibrate(longArrayOf(0, 500, 250, 500))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

@@ -29,6 +29,7 @@ class ScheduleService extends ChangeNotifier {
  bool _isAutoSyncRunning = false;
  String _currentElderId ='';
  String _lastSavedJson ='';
+ String? _lastTriggeredSosKey;
 
  final CloudSyncService _cloudSync = CloudSyncService();
 
@@ -558,6 +559,49 @@ class ScheduleService extends ChangeNotifier {
 
  try {
  if (_currentElderId.isEmpty) return;
+
+ if (isCaretakerMode) {
+ try {
+ final sosData = await _cloudSync.pullSosAlertCloud(_currentElderId);
+ if (sosData != null && sosData['active'] == true) {
+ final String sosTitle = sosData['title'] ?? '🚨 Caregiver Alert: Elder Missed Reminder!';
+ final String sosMessage = sosData['message'] ?? 'Elder has missed 3 reminders.';
+ final String sosRemId = sosData['reminderId'] ?? '';
+ final String sosKey = "${sosRemId}_${sosData['timestamp']}";
+
+ if (_lastTriggeredSosKey != sosKey) {
+ _lastTriggeredSosKey = sosKey;
+
+ NotificationService.showSystemNotification(
+ title: sosTitle,
+ body: sosMessage,
+ spokenText: sosMessage,
+ fallbackEnglishText: sosMessage,
+ reminderId: sosRemId,
+ takenLabel: 'Check Elder',
+ yetToTakeLabel: 'Dismiss',
+ langCode: 'en',
+ showActions: false,
+ speak: false,
+ );
+
+ NotificationService.playEmergencyBeepAlarm();
+
+ _activeNotification = {
+ 'id': 'notif_sos_${DateTime.now().millisecondsSinceEpoch}',
+ 'reminderId': sosRemId,
+ 'title': sosTitle,
+ 'body': sosMessage,
+ 'isCaregiverAlert': true,
+ 'timestamp': DateTime.now(),
+ };
+ notifyListeners();
+ }
+ }
+ } catch (e) {
+ debugPrint('Caregiver SOS pull error: $e');
+ }
+ }
 
  final pullResponse = await _cloudSync.pullScheduleCloudDetailed(_currentElderId);
 
@@ -1214,10 +1258,25 @@ class ScheduleService extends ChangeNotifier {
 
  /// Triggers specialized notification with interactive Taken / Yet to Take drag-down action buttons
  void triggerScheduleNotificationItem(ReminderItem item, {I18nService? i18n, bool force = false, int attemptCount = 1}) {
- if (attemptCount < 4) {
- if (isCaretakerMode) return;
+ if (attemptCount >= 4) {
+ if (!isCaretakerMode) {
+ // Elder missed 3 attempts (Attempt 4 triggered). Push SOS alert to Cloud Relay for Caregiver!
+ final activeElderId = _currentElderId.isNotEmpty ? _currentElderId : 'NER-4821';
+ final alertTitle = '🚨 Caregiver Alert: Elder Missed Reminder!';
+ final alertMsg = 'Elder has not taken/started "${item.title}" after 3 reminders. Please check on Elder immediately.';
+
+ _cloudSync.pushSosAlertCloud(
+ activeElderId,
+ title: alertTitle,
+ message: alertMsg,
+ reminderId: item.id,
+ );
+
+ debugPrint('4th SOS Alert pushed to cloud for Caregiver for elderId: $activeElderId');
+ return;
+ }
  } else {
- if (!isCaretakerMode) return;
+ if (isCaretakerMode) return;
  }
  if (item.isCompleted) return;
 

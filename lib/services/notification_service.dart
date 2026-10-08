@@ -376,6 +376,7 @@ class NotificationService {
         'clonedVoiceSamplePath': effectiveClonedVoiceSamplePath,
         'medicineImagePath': medicineImagePath,
         'pillsCount': pillsCount,
+        'langCode': langCode,
       });
     } catch (_) {}
 
