@@ -49,13 +49,10 @@ class FullScreenAlarmActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
         } else {
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
                         WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
                         WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             )
@@ -443,6 +440,40 @@ class FullScreenAlarmActivity : Activity() {
             }
             startActivity(reorderIntent)
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (!isAcknowledged) {
+            val reorderIntent = Intent(this, FullScreenAlarmActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            }
+            startActivity(reorderIntent)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isAcknowledged) {
+            val reorderIntent = Intent(this, FullScreenAlarmActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            }
+            startActivity(reorderIntent)
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (!isAcknowledged) {
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK ||
+                keyCode == android.view.KeyEvent.KEYCODE_HOME ||
+                keyCode == android.view.KeyEvent.KEYCODE_APP_SWITCH ||
+                keyCode == android.view.KeyEvent.KEYCODE_MENU) {
+                val msg = if (currentLangCode == "ta") "நினைவூட்டலை உறுதிப்படுத்த ஏதேனும் 2 விருப்பங்களில் ஒன்றை அழுத்தவும்!" else "Please select one of the two options to acknowledge!"
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     @Suppress("DEPRECATION")

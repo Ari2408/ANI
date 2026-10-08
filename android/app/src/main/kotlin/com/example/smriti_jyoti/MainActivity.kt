@@ -491,6 +491,13 @@ class MainActivity : FlutterActivity() {
 
         if (!isHydration && reminderId != "hyd") {
             builder.setFullScreenIntent(fullScreenPendingIntent, true)
+            try {
+                startActivity(fullScreenIntent)
+            } catch (e: Exception) {
+                try {
+                    fullScreenPendingIntent.send()
+                } catch (_: Exception) {}
+            }
         }
 
         val isAppointment = isAppointmentReminder(reminderId, title, body)
