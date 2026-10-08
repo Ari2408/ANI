@@ -15,6 +15,8 @@ import'cloud_sync_service.dart';
 class ScheduleService extends ChangeNotifier {
  double _hydrationTargetLiters = 2.0; // Default: 2.0 Liters (8 glasses) for elder hydration
  int _hydrationCurrentGlasses = 0;
+ int _hydrationVoiceMode = 0; // 0: Standard AI Voice, 1: Voice Recorded Note
+ String? _hydrationCustomVoicePath;
 
  final List<ReminderItem> _reminders = [];
  final Map<String, Timer> _scheduledTimers = {};
@@ -240,6 +242,8 @@ class ScheduleService extends ChangeNotifier {
  final hydState = HiveService.getHydrationStateForElder(targetId);
  _hydrationTargetLiters = prefs.getDouble(hydKey) ?? (hydState?['targetLiters'] as num?)?.toDouble() ?? 2.0;
  _hydrationCurrentGlasses = prefs.getInt('${hydKey}_glasses') ?? (hydState?['currentGlasses'] as num?)?.toInt() ?? 0;
+ _hydrationVoiceMode = prefs.getInt('${hydKey}_voiceMode') ?? 0;
+ _hydrationCustomVoicePath = prefs.getString('${hydKey}_customVoicePath');
 
  _breakfastVoicePath = prefs.getString('aninai_meal_voice_breakfast_$targetId') ?? prefs.getString('aninai_meal_voice_breakfast');
  _lunchVoicePath = prefs.getString('aninai_meal_voice_lunch_$targetId') ?? prefs.getString('aninai_meal_voice_lunch');
@@ -428,6 +432,10 @@ class ScheduleService extends ChangeNotifier {
  final hydKey ='aninai_hydration_$targetId';
  await prefs.setDouble(hydKey, _hydrationTargetLiters);
  await prefs.setInt('${hydKey}_glasses', _hydrationCurrentGlasses);
+ await prefs.setInt('${hydKey}_voiceMode', _hydrationVoiceMode);
+ if (_hydrationCustomVoicePath != null && _hydrationCustomVoicePath!.isNotEmpty) {
+ await prefs.setString('${hydKey}_customVoicePath', _hydrationCustomVoicePath!);
+ }
 
  if (_webRtcService != null && _webRtcService!.isConnected) {
  _webRtcService!.syncAllRemindersOverP2P();
@@ -576,6 +584,19 @@ class ScheduleService extends ChangeNotifier {
  int get hydrationTargetGlasses => (_hydrationTargetLiters * 4).round();
  int get hydrationCurrentGlasses => _hydrationCurrentGlasses;
  double get hydrationCurrentLiters => _hydrationCurrentGlasses * 0.25;
+ int get hydrationVoiceMode => _hydrationVoiceMode;
+ String? get hydrationCustomVoicePath => _hydrationCustomVoicePath;
+
+ void setHydrationVoiceConfig(int mode, String? customPath, {I18nService? i18n}) {
+ if (i18n != null) _i18n = i18n;
+ _hydrationVoiceMode = mode;
+ if (customPath != null && customPath.isNotEmpty) {
+ _hydrationCustomVoicePath = customPath;
+ }
+ saveSchedules();
+ notifyListeners();
+ }
+
  List<ReminderItem> get reminders => _reminders;
  Map<String, dynamic>? get activeNotification => _activeNotification;
  bool get isHydrationTimerActive => _hydrationTimer != null && _hydrationTimer!.isActive;
@@ -905,9 +926,11 @@ class ScheduleService extends ChangeNotifier {
  NotificationService.showSystemNotification(
  title: title,
  body: body,
- spokenText:'$title. $body',
+ spokenText: '$title. $body',
  fallbackEnglishText: fallbackEn,
- reminderId:'hyd',
+ customVoicePath: _hydrationVoiceMode == 1 ? _hydrationCustomVoicePath : null,
+ voiceMode: _hydrationVoiceMode,
+ reminderId: 'hyd',
  takenLabel: logWaterBtnText,
  yetToTakeLabel: logWaterBtnText,
  langCode: langCode,
@@ -1318,8 +1341,13 @@ class ScheduleService extends ChangeNotifier {
  ? rawYetToTake
  : (isTamil ?'எடுக்கவில்லை':'Yet to Take');
 
- final takenLabel = isRoutine ? startedLabel : takenText;
- final yetToTakeLabel = isRoutine ? notStartedLabel : yetToTakeText;
+ final isAppt = item.type == ReminderType.appointment;
+ final takenLabel = isAppt
+ ? (isTamil ? 'சென்றேன்' : 'Attended')
+ : (isRoutine ? startedLabel : takenText);
+ final yetToTakeLabel = isAppt
+ ? (isTamil ? 'செல்லவில்லை' : 'Not Attended')
+ : (isRoutine ? notStartedLabel : yetToTakeText);
 
  NotificationService.showSystemNotification(
  title: notifTitle,
@@ -1334,7 +1362,7 @@ class ScheduleService extends ChangeNotifier {
  yetToTakeLabel: yetToTakeLabel,
  langCode: langCode,
  isHydration: item.type == ReminderType.hydration,
- showActions: attemptCount < 4 && (item.type == ReminderType.medicine || item.type == ReminderType.routine),
+ showActions: attemptCount < 4 && (item.type == ReminderType.medicine || item.type == ReminderType.routine || item.type == ReminderType.appointment),
  speak: attemptCount < 4,
  onAction: item.type == ReminderType.hydration ? () => logWaterGlass() : null,
  onTaken: () => markReminderTaken(item.id),
@@ -1853,10 +1881,14 @@ class ScheduleService extends ChangeNotifier {
  ? rawYetToTake
  : (isTamil ?'எடுக்கவில்லை':'Yet to Take');
 
- final itemTakenLabel = isRoutine ? startedLabel : takenText;
- final itemYetToTakeLabel = isRoutine ? notStartedLabel : yetToTakeText;
-
  final isAppt = item.type == ReminderType.appointment;
+ final itemTakenLabel = isAppt
+ ? (isTamil ? 'சென்றேன்' : 'Attended')
+ : (isRoutine ? startedLabel : takenText);
+ final itemYetToTakeLabel = isAppt
+ ? (isTamil ? 'செல்லவில்லை' : 'Not Attended')
+ : (isRoutine ? notStartedLabel : yetToTakeText);
+
  final effectiveCustomVoicePath = isAppt ?'': item.customVoicePath;
  final effectiveVoiceMode = isAppt ? 0 : item.voiceMode;
  final effectiveClonedVoiceSamplePath = isAppt ?'': item.clonedVoiceSamplePath;
@@ -1876,7 +1908,7 @@ class ScheduleService extends ChangeNotifier {
  clonedVoiceSamplePath: effectiveClonedVoiceSamplePath,
  langCode: langCode,
  isHydration: item.type == ReminderType.hydration,
- showActions: item.type == ReminderType.medicine || item.type == ReminderType.routine,
+ showActions: item.type == ReminderType.medicine || item.type == ReminderType.routine || item.type == ReminderType.appointment,
  medicineImagePath: item.medicineImagePath,
  pillsCount: item.pillsCount,
  );

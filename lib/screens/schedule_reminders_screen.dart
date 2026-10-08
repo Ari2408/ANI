@@ -72,6 +72,11 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  String? _clonedVoiceSamplePath;
  Timer? _sampleRecordTimer;
 
+ bool _isRecordingHydrationVoice = false;
+ int _hydrationRecordSeconds = 0;
+ Timer? _hydrationRecordTimer;
+ String? _hydrationCustomVoicePath;
+
  final AudioRecorder _audioRecorder = AudioRecorder();
  final AudioPlayer _audioPlayer = AudioPlayer();
 
@@ -93,6 +98,7 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  if (schedule.hydrationTargetLiters > 0) {
  _litersCtrl.text = schedule.hydrationTargetLiters.toStringAsFixed(1);
  }
+ _hydrationCustomVoicePath = schedule.hydrationCustomVoicePath;
  _litersCtrlInitialized = true;
  }
  }
@@ -101,6 +107,7 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  void dispose() {
  _recordTimer?.cancel();
  _sampleRecordTimer?.cancel();
+ _hydrationRecordTimer?.cancel();
  _audioRecorder.dispose();
  _audioPlayer.dispose();
  _litersCtrl.dispose();
@@ -172,6 +179,60 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  setState(() {
  _isRecordingVoice = false;
  });
+ }
+ }
+
+ Future<void> _startRecordingHydrationVoice() async {
+ try {
+ final hasPermission = await _audioRecorder.hasPermission();
+ if (!hasPermission) return;
+ final dir = await getApplicationDocumentsDirectory();
+ final path = '${dir.path}/hydration_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+ await _audioRecorder.start(
+ const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100),
+ path: path,
+ );
+ setState(() {
+ _isRecordingHydrationVoice = true;
+ _hydrationRecordSeconds = 0;
+ });
+ _hydrationRecordTimer?.cancel();
+ _hydrationRecordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+ if (mounted) {
+ setState(() => _hydrationRecordSeconds++);
+ }
+ });
+ } catch (e) {
+ debugPrint('Error starting hydration voice recording: $e');
+ }
+ }
+
+ Future<void> _stopRecordingHydrationVoice(ScheduleService schedule) async {
+ _hydrationRecordTimer?.cancel();
+ _hydrationRecordTimer = null;
+ try {
+ final path = await _audioRecorder.stop();
+ setState(() {
+ _isRecordingHydrationVoice = false;
+ if (path != null && path.isNotEmpty) {
+ _hydrationCustomVoicePath = path;
+ }
+ });
+ if (path != null && path.isNotEmpty) {
+ schedule.setHydrationVoiceConfig(1, path);
+ }
+ } catch (e) {
+ debugPrint('Error stopping hydration voice recording: $e');
+ setState(() => _isRecordingHydrationVoice = false);
+ }
+ }
+
+ Future<void> _playRecordedHydrationVoice(String path) async {
+ try {
+ await _audioPlayer.stop();
+ await _audioPlayer.play(DeviceFileSource(path));
+ } catch (e) {
+ debugPrint('Error playing recorded hydration voice: $e');
  }
  }
 
@@ -1587,6 +1648,7 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  int currentGlasses,
  int targetGlasses,
  ) {
+ final isTamil = i18n.currentLang.toLowerCase() == 'ta';
  return ElderCard(
  padding: const EdgeInsets.all(12),
  backgroundColor: const Color(0xFFFDF0E6),
@@ -1660,8 +1722,207 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  _showHydrationSuccessDialog(context, i18n, schedule);
  },
  ),
- const SizedBox(height: 4),
+ const SizedBox(height: 12),
  ],
+
+ // Hydration Hourly Voice Alert Mode Section
+ Container(
+ width: double.infinity,
+ padding: const EdgeInsets.all(12),
+ decoration: BoxDecoration(
+ color: Colors.white,
+ borderRadius: BorderRadius.circular(14),
+ border: Border.all(color: const Color(0xFF61C5B0).withOpacity(0.5)),
+ boxShadow: [
+ BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 2))
+ ],
+ ),
+ child: Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ Row(
+ children: [
+ const Icon(Icons.record_voice_over, color: Color(0xFF0D9488), size: 20),
+ const SizedBox(width: 8),
+ Text(
+ isTamil ? 'மணிநேர குடிநீர் குரல் நினைவூட்டல்' : 'Hourly Hydration Voice Option',
+ style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+ ),
+ ],
+ ),
+ const SizedBox(height: 8),
+
+ // Option 1: Standard AI Voice
+ InkWell(
+ onTap: () {
+ schedule.setHydrationVoiceConfig(0, _hydrationCustomVoicePath, i18n: i18n);
+ },
+ child: Container(
+ padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+ margin: const EdgeInsets.only(bottom: 6),
+ decoration: BoxDecoration(
+ color: schedule.hydrationVoiceMode == 0 ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+ borderRadius: BorderRadius.circular(10),
+ border: Border.all(
+ color: schedule.hydrationVoiceMode == 0 ? const Color(0xFF16A34A) : Colors.grey.shade300,
+ width: schedule.hydrationVoiceMode == 0 ? 1.5 : 1.0,
+ ),
+ ),
+ child: Row(
+ children: [
+ Radio<int>(
+ value: 0,
+ groupValue: schedule.hydrationVoiceMode,
+ activeColor: const Color(0xFF16A34A),
+ onChanged: (val) {
+ if (val != null) schedule.setHydrationVoiceConfig(val, _hydrationCustomVoicePath, i18n: i18n);
+ },
+ ),
+ Expanded(
+ child: Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ Text(
+ isTamil ? 'நிலையான AI குரல் (Standard AI Voice)' : 'Standard AI Voice',
+ style: TextStyle(
+ fontSize: 13,
+ fontWeight: schedule.hydrationVoiceMode == 0 ? FontWeight.bold : FontWeight.w600,
+ color: const Color(0xFF1E293B),
+ ),
+ ),
+ Text(
+ isTamil ? 'ஒவ்வொரு மணிநேரமும் சிஸ்டம் AI குரல் ஒலிக்கும்' : 'Plays standard system AI voice alert every hour',
+ style: const TextStyle(fontSize: 11, color: Colors.black54),
+ ),
+ ],
+ ),
+ ),
+ ],
+ ),
+ ),
+ ),
+
+ // Option 2: Voice Recorded Note
+ InkWell(
+ onTap: () {
+ schedule.setHydrationVoiceConfig(1, _hydrationCustomVoicePath, i18n: i18n);
+ },
+ child: Container(
+ padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+ decoration: BoxDecoration(
+ color: schedule.hydrationVoiceMode == 1 ? const Color(0xFFFEF3C7) : const Color(0xFFF8FAFC),
+ borderRadius: BorderRadius.circular(10),
+ border: Border.all(
+ color: schedule.hydrationVoiceMode == 1 ? const Color(0xFFD97706) : Colors.grey.shade300,
+ width: schedule.hydrationVoiceMode == 1 ? 1.5 : 1.0,
+ ),
+ ),
+ child: Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ Row(
+ children: [
+ Radio<int>(
+ value: 1,
+ groupValue: schedule.hydrationVoiceMode,
+ activeColor: const Color(0xFFD97706),
+ onChanged: (val) {
+ if (val != null) schedule.setHydrationVoiceConfig(val, _hydrationCustomVoicePath, i18n: i18n);
+ },
+ ),
+ Expanded(
+ child: Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ Text(
+ isTamil ? 'பதிவுசெய்த குரல் பதிவு (Voice Recorded Note)' : 'Voice Recorded Note',
+ style: TextStyle(
+ fontSize: 13,
+ fontWeight: schedule.hydrationVoiceMode == 1 ? FontWeight.bold : FontWeight.w600,
+ color: const Color(0xFF1E293B),
+ ),
+ ),
+ Text(
+ isTamil ? 'ஒவ்வொரு மணிநேரமும் உங்கள் சொந்த குரல் பதிவு ஒலிக்கும்' : 'Plays your recorded voice note on every hour notification',
+ style: const TextStyle(fontSize: 11, color: Colors.black54),
+ ),
+ ],
+ ),
+ ),
+ ],
+ ),
+
+ if (schedule.hydrationVoiceMode == 1) ...[
+ const SizedBox(height: 8),
+ Row(
+ children: [
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: _isRecordingHydrationVoice ? Colors.red : const Color(0xFFD97706),
+ padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ onPressed: () {
+ if (_isRecordingHydrationVoice) {
+ _stopRecordingHydrationVoice(schedule);
+ } else {
+ _startRecordingHydrationVoice();
+ }
+ },
+ icon: Icon(
+ _isRecordingHydrationVoice ? Icons.stop : Icons.mic,
+ color: Colors.white,
+ size: 18,
+ ),
+ label: Text(
+ _isRecordingHydrationVoice
+ ? '${isTamil ? "நிறுத்து" : "Stop"} (${_hydrationRecordSeconds}s)'
+ : (isTamil ? 'குரல் பதிவுசெய்' : 'Record Voice Note'),
+ style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+ ),
+ ),
+ ),
+ if (_hydrationCustomVoicePath != null && File(_hydrationCustomVoicePath!).existsSync()) ...[
+ const SizedBox(width: 8),
+ IconButton(
+ icon: const Icon(Icons.play_circle_fill, color: Color(0xFFD97706), size: 32),
+ tooltip: isTamil ? 'குரலை மாதிரி கேள்' : 'Preview Recording',
+ onPressed: () => _playRecordedHydrationVoice(_hydrationCustomVoicePath!),
+ ),
+ ],
+ ],
+ ),
+ if (_hydrationCustomVoicePath != null && File(_hydrationCustomVoicePath!).existsSync()) ...[
+ const SizedBox(height: 6),
+ Container(
+ padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+ decoration: BoxDecoration(
+ color: const Color(0xFFDCFCE7),
+ borderRadius: BorderRadius.circular(6),
+ ),
+ child: Row(
+ children: [
+ const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 14),
+ const SizedBox(width: 6),
+ Expanded(
+ child: Text(
+ isTamil ? 'குரல் பதிவு சேமிக்கப்பட்டது! 1 மணிநேர நினைவூட்டலில் ஒலிக்கும்.' : 'Voice note active & saved! Plays on every 1-hr notification.',
+ style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+ ),
+ ),
+ ],
+ ),
+ ),
+ ],
+ ],
+ ],
+ ),
+ ),
+ ),
+ ],
+ ),
+ ),
  ],
  ),
  );

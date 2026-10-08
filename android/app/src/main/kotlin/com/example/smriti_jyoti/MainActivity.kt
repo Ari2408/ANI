@@ -269,6 +269,8 @@ class MainActivity : FlutterActivity() {
         try {
             val isRoutine = reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine") ||
                     title.contains("Daily Activity") || title.contains("தினசரி") || title.contains("dinasari")
+            val isAppt = reminderId.startsWith("apt_") || reminderId.contains("apt") || reminderId.contains("appointment") ||
+                    title.contains("Appointment") || title.contains("சந்திப்பு") || title.contains("sandhippu") || title.contains("Doctor")
             val effectiveCustomVoicePath = customVoicePath
             var effectiveVoiceMode = voiceMode
             if (effectiveCustomVoicePath.isNotEmpty() && java.io.File(effectiveCustomVoicePath).exists() && java.io.File(effectiveCustomVoicePath).length() > 0) {
@@ -276,15 +278,17 @@ class MainActivity : FlutterActivity() {
             }
             val effectiveClonedVoiceSamplePath = clonedVoiceSamplePath
 
-            val finalTakenLabel = if (takenLabel.isEmpty() || takenLabel == "startedBtn" || takenLabel == "takenBtn") {
-                if (isRoutine) (if (langCode == "ta") "தொடங்கப்பட்டது" else "Started")
+            val finalTakenLabel = if (takenLabel.isEmpty() || takenLabel == "startedBtn" || takenLabel == "takenBtn" || takenLabel == "attendedBtn") {
+                if (isAppt) (if (langCode == "ta") "சென்றேன்" else "Attended")
+                else if (isRoutine) (if (langCode == "ta") "தொடங்கப்பட்டது" else "Started")
                 else (if (langCode == "ta") "எடுத்துக்கொண்டேன்" else "Taken")
             } else {
                 takenLabel
             }
 
-            val finalYetToTakeLabel = if (yetToTakeLabel.isEmpty() || yetToTakeLabel == "notStartedBtn" || yetToTakeLabel == "yetToTakeBtn") {
-                if (isRoutine) (if (langCode == "ta") "தொடங்கவில்லை" else "Not Started")
+            val finalYetToTakeLabel = if (yetToTakeLabel.isEmpty() || yetToTakeLabel == "notStartedBtn" || yetToTakeLabel == "yetToTakeBtn" || yetToTakeLabel == "notAttendedBtn") {
+                if (isAppt) (if (langCode == "ta") "செல்லவில்லை" else "Not Attended")
+                else if (isRoutine) (if (langCode == "ta") "தொடங்கவில்லை" else "Not Started")
                 else (if (langCode == "ta") "எடுக்கவில்லை" else "Yet to Take")
             } else {
                 yetToTakeLabel

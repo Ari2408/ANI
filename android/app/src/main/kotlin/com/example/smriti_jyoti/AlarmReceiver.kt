@@ -81,15 +81,17 @@ class AlarmReceiver : BroadcastReceiver() {
                     body.contains("Daily Activity") || body.contains("தினசரி")
             val showActions = if (isAppt || attemptCount >= 4) false else intent.getBooleanExtra("showActions", reminderId.startsWith("med_") || reminderId.startsWith("act_") || isRoutine)
 
-            val takenLabel = if (rawTakenLabel.isEmpty() || rawTakenLabel == "startedBtn" || rawTakenLabel == "takenBtn") {
-                if (isRoutine) (if (langCode == "ta") "தொடங்கப்பட்டது" else "Started")
+            val takenLabel = if (rawTakenLabel.isEmpty() || rawTakenLabel == "startedBtn" || rawTakenLabel == "takenBtn" || rawTakenLabel == "attendedBtn") {
+                if (isAppt) (if (langCode == "ta") "சென்றேன்" else "Attended")
+                else if (isRoutine) (if (langCode == "ta") "தொடங்கப்பட்டது" else "Started")
                 else (if (langCode == "ta") "எடுத்துக்கொண்டேன்" else "Taken")
             } else {
                 rawTakenLabel
             }
 
-            val yetToTakeLabel = if (rawYetToTakeLabel.isEmpty() || rawYetToTakeLabel == "notStartedBtn" || rawYetToTakeLabel == "yetToTakeBtn") {
-                if (isRoutine) (if (langCode == "ta") "தொடங்கவில்லை" else "Not Started")
+            val yetToTakeLabel = if (rawYetToTakeLabel.isEmpty() || rawYetToTakeLabel == "notStartedBtn" || rawYetToTakeLabel == "yetToTakeBtn" || rawYetToTakeLabel == "notAttendedBtn") {
+                if (isAppt) (if (langCode == "ta") "செல்லவில்லை" else "Not Attended")
+                else if (isRoutine) (if (langCode == "ta") "தொடங்கவில்லை" else "Not Started")
                 else (if (langCode == "ta") "எடுக்கவில்லை" else "Yet to Take")
             } else {
                 rawYetToTakeLabel
@@ -219,8 +221,8 @@ class AlarmReceiver : BroadcastReceiver() {
                     putExtra("yetToTakeLabel", yetToTakeLabel)
                     putExtra("spokenText", spokenText)
                     putExtra("fallbackText", fallbackText)
-                    putExtra("customVoicePath", "")
-                    putExtra("voiceMode", 0)
+                    putExtra("customVoicePath", effectiveCustomVoicePath)
+                    putExtra("voiceMode", effectiveVoiceMode)
                     putExtra("clonedVoiceSamplePath", "")
                     putExtra("langCode", langCode)
                     putExtra("isHydration", true)
@@ -236,7 +238,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 // Persist the re-armed hourly alarm timestamp in SharedPreferences so boot restore keeps it!
                 try {
                     val prefs = context.getSharedPreferences("aninai_native_alarms", Context.MODE_PRIVATE)
-                    val valueStr = "999999|||$nextTriggerMs|||$title|||$body|||hyd|||$takenLabel|||$yetToTakeLabel|||$spokenText|||$langCode|||true||||||0||||||$fallbackText|||false"
+                    val valueStr = "999999|||$nextTriggerMs|||$title|||$body|||hyd|||$takenLabel|||$yetToTakeLabel|||$spokenText|||$langCode|||true|||$effectiveCustomVoicePath|||$effectiveVoiceMode||||||$fallbackText|||false"
                     prefs.edit().putString("999999", valueStr).apply()
                 } catch (e: Exception) {
                     android.util.Log.e("AninaiTTS", "Error updating native hydration alarm in SharedPreferences", e)

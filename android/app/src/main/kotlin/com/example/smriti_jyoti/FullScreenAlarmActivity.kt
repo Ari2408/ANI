@@ -97,26 +97,26 @@ class FullScreenAlarmActivity : Activity() {
                 title.contains("Appointment") || title.contains("சந்திப்பு") || title.contains("sandhippu") || title.contains("Doctor")
         val disableAnimation = isRoutine || isAppt
 
-        val takenLabel = if (rawTakenLabel.isNotEmpty() && rawTakenLabel != "takenBtn" && rawTakenLabel != "startedBtn" && rawTakenLabel != "attendedBtn") {
-            rawTakenLabel
-        } else if (isHydration) {
+        val takenLabel = if (isHydration) {
             if (langCode == "ta") "💧 1 டம்ளர் தண்ணீர் பதிவுசெய்" else "💧 Log 1 Glass Water"
-        } else if (isRoutine) {
-            if (langCode == "ta") "✅ தொடங்கப்பட்டது" else "✅ Started"
         } else if (isAppt) {
             if (langCode == "ta") "✅ சென்றேன்" else "✅ Attended"
+        } else if (isRoutine) {
+            if (langCode == "ta") "✅ தொடங்கப்பட்டது" else "✅ Started"
+        } else if (rawTakenLabel.isNotEmpty() && rawTakenLabel != "takenBtn" && rawTakenLabel != "startedBtn" && rawTakenLabel != "attendedBtn" && rawTakenLabel != "Taken") {
+            rawTakenLabel
         } else {
             if (langCode == "ta") "✅ எடுத்துக்கொண்டேன்" else "✅ Taken"
         }
 
-        val yetToTakeLabel = if (rawYetToTakeLabel.isNotEmpty() && rawYetToTakeLabel != "yetToTakeBtn" && rawYetToTakeLabel != "notStartedBtn" && rawYetToTakeLabel != "notAttendedBtn") {
-            rawYetToTakeLabel
-        } else if (isHydration) {
+        val yetToTakeLabel = if (isHydration) {
             if (langCode == "ta") "⏰ பின்னர் நினைவூட்டு" else "⏰ Remind Later"
-        } else if (isRoutine) {
-            if (langCode == "ta") "⏳ தொடங்கவில்லை" else "⏳ Not Started"
         } else if (isAppt) {
             if (langCode == "ta") "⏳ செல்லவில்லை" else "⏳ Not Attended"
+        } else if (isRoutine) {
+            if (langCode == "ta") "⏳ தொடங்கவில்லை" else "⏳ Not Started"
+        } else if (rawYetToTakeLabel.isNotEmpty() && rawYetToTakeLabel != "yetToTakeBtn" && rawYetToTakeLabel != "notStartedBtn" && rawYetToTakeLabel != "notAttendedBtn" && rawYetToTakeLabel != "Yet to Take") {
+            rawYetToTakeLabel
         } else {
             if (langCode == "ta") "⏳ எடுக்கவில்லை" else "⏳ Yet to Take"
         }
