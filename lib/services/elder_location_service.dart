@@ -14,7 +14,7 @@ enum LocationConnectionState {
 }
 
 class ElderLocationService extends ChangeNotifier {
-  static const MethodChannel _nativeChannel = MethodChannel('com.purb_chetana/notifications');
+  static const MethodChannel _nativeChannel = MethodChannel('com.aninai/notifications');
 
   // Elder device state
   bool _isSharingActive = true;
@@ -58,7 +58,7 @@ class ElderLocationService extends ChangeNotifier {
   Future<void> _loadLocalSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _isSharingActive = prefs.getBool('purb_chetana_location_sharing_active') ?? true;
+      _isSharingActive = prefs.getBool('aninai_location_sharing_active') ?? true;
       notifyListeners();
     } catch (_) {}
   }
@@ -277,7 +277,7 @@ class ElderLocationService extends ChangeNotifier {
   Future<void> toggleLocationSharing(String elderId) async {
     _isSharingActive = !_isSharingActive;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('purb_chetana_location_sharing_active', _isSharingActive);
+    await prefs.setBool('aninai_location_sharing_active', _isSharingActive);
 
     if (_isSharingActive) {
       await startElderTracking(elderId);

@@ -16,8 +16,8 @@ import androidx.core.app.NotificationCompat
 import java.util.Locale
 
 class AlarmReceiver : BroadcastReceiver() {
-    private val NOTIFICATION_CHANNEL_ID = "purb_chetana_reminders_v4"
-    private val NOTIFICATION_CHANNEL_NAME = "Purb Chetana Reminders"
+    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v4"
+    private val NOTIFICATION_CHANNEL_NAME = "Aninai Reminders"
 
     companion object {
         @JvmStatic
@@ -37,35 +37,41 @@ class AlarmReceiver : BroadcastReceiver() {
                 val stepManager = StepCounterManager.getInstance(context)
                 if (stepManager.isTrackingEnabled()) {
                     StepTrackingService.startService(context)
-                    android.util.Log.d("PurbChetanaSteps", "Restored StepTrackingService on boot")
+                    android.util.Log.d("AninaiSteps", "Restored StepTrackingService on boot")
                 }
             } catch (e: Exception) {
-                android.util.Log.e("PurbChetanaSteps", "Error restoring StepTrackingService on boot", e)
+                android.util.Log.e("AninaiSteps", "Error restoring StepTrackingService on boot", e)
             }
             return
         }
 
-        if (action == "com.purb_chetana.ACTION_TRIGGER_ALARM") {
+        if (action == "com.aninai.ACTION_TRIGGER_ALARM") {
             val attemptCount = intent.getIntExtra("attemptCount", 1)
             try {
                 val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                val userJson = flutterPrefs.getString("flutter.purb_chetana_user", "") ?: ""
+                val userJson = flutterPrefs.getString("flutter.aninai_user", "") ?: ""
                 val isCaretaker = userJson.contains("\"role\":\"caretaker\"") || userJson.contains("\"role\": \"caretaker\"")
 
                 if (attemptCount < 4 && isCaretaker) {
-                    android.util.Log.d("PurbChetanaTTS", "Attempts 1-3 are Elder only. Suppressing for Caregiver.")
+                    android.util.Log.d("AninaiTTS", "Attempts 1-3 are Elder only. Suppressing for Caregiver.")
+                    return
+                }
+                if (attemptCount >= 4 && !isCaretaker) {
+                    android.util.Log.d("AninaiTTS", "Attempt 4 Caregiver SOS alert is Caregiver only. Suppressing for Elder.")
                     return
                 }
             } catch (e: Exception) {
-                android.util.Log.e("PurbChetanaTTS", "Error checking caregiver role in AlarmReceiver", e)
+                android.util.Log.e("AninaiTTS", "Error checking caregiver role in AlarmReceiver", e)
             }
-            val title = intent.getStringExtra("title") ?: "Purb Chetana Reminder"
+            val title = intent.getStringExtra("title") ?: "Aninai Reminder"
             val body = intent.getStringExtra("body") ?: "You have a scheduled reminder."
             val id = intent.getIntExtra("id", (System.currentTimeMillis() % 100000).toInt())
             val reminderId = intent.getStringExtra("reminderId") ?: ""
             val rawTakenLabel = intent.getStringExtra("takenLabel") ?: ""
             val rawYetToTakeLabel = intent.getStringExtra("yetToTakeLabel") ?: ""
             val isHydration = intent.getBooleanExtra("isHydration", false)
+            val medicineImagePath = intent.getStringExtra("medicineImagePath") ?: ""
+            val pillsCount = intent.getStringExtra("pillsCount") ?: ""
             val spokenText = intent.getStringExtra("spokenText") ?: "$title. $body"
             val fallbackText = intent.getStringExtra("fallbackText") ?: ""
             val customVoicePath = intent.getStringExtra("customVoicePath") ?: ""
@@ -79,15 +85,17 @@ class AlarmReceiver : BroadcastReceiver() {
                     body.contains("Daily Activity") || body.contains("தினசரி")
             val showActions = if (isAppt || attemptCount >= 4) false else intent.getBooleanExtra("showActions", reminderId.startsWith("med_") || reminderId.startsWith("act_") || isRoutine)
 
-            val takenLabel = if (rawTakenLabel.isEmpty() || rawTakenLabel == "startedBtn" || rawTakenLabel == "takenBtn") {
-                if (isRoutine) (if (langCode == "ta") "தொடங்கப்பட்டது" else "Started")
+            val takenLabel = if (rawTakenLabel.isEmpty() || rawTakenLabel == "startedBtn" || rawTakenLabel == "takenBtn" || rawTakenLabel == "attendedBtn") {
+                if (isAppt) (if (langCode == "ta") "சென்றேன்" else "Attended")
+                else if (isRoutine) (if (langCode == "ta") "தொடங்கப்பட்டது" else "Started")
                 else (if (langCode == "ta") "எடுத்துக்கொண்டேன்" else "Taken")
             } else {
                 rawTakenLabel
             }
 
-            val yetToTakeLabel = if (rawYetToTakeLabel.isEmpty() || rawYetToTakeLabel == "notStartedBtn" || rawYetToTakeLabel == "yetToTakeBtn") {
-                if (isRoutine) (if (langCode == "ta") "தொடங்கவில்லை" else "Not Started")
+            val yetToTakeLabel = if (rawYetToTakeLabel.isEmpty() || rawYetToTakeLabel == "notStartedBtn" || rawYetToTakeLabel == "yetToTakeBtn" || rawYetToTakeLabel == "notAttendedBtn") {
+                if (isAppt) (if (langCode == "ta") "செல்லவில்லை" else "Not Attended")
+                else if (isRoutine) (if (langCode == "ta") "தொடங்கவில்லை" else "Not Started")
                 else (if (langCode == "ta") "எடுக்கவில்லை" else "Yet to Take")
             } else {
                 rawYetToTakeLabel
@@ -98,7 +106,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
             if (!isAppt && effectiveCustomVoicePath.isNotEmpty() && java.io.File(effectiveCustomVoicePath).exists() && java.io.File(effectiveCustomVoicePath).length() > 0) {
                 effectiveVoiceMode = 1
-            } else if (!isAppt && (isRoutine || reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine"))) {
+            } else if (!isAppt && (isHydration || reminderId == "hyd" || isRoutine || reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine"))) {
                 try {
                     val dataDir = context.applicationInfo.dataDir
                     val searchDirs = listOf(
@@ -110,7 +118,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     for (dir in searchDirs) {
                         if (dir.exists() && dir.isDirectory) {
                             dir.listFiles()?.filter { f ->
-                                f.isFile && f.name.contains("custom_reminder_voice_") && f.name.endsWith(".m4a") && f.length() > 0
+                                f.isFile && (f.name.contains("hydration_voice_") || f.name.contains("custom_reminder_voice_") || f.name.contains("meal_voice_")) && f.name.endsWith(".m4a") && f.length() > 0
                             }?.forEach { f ->
                                 if (latestFile == null || f.lastModified() > latestFile!!.lastModified()) {
                                     latestFile = f
@@ -118,21 +126,21 @@ class AlarmReceiver : BroadcastReceiver() {
                             }
                         }
                     }
-                    if (latestFile != null) {
+                    if (latestFile != null && effectiveCustomVoicePath.isEmpty()) {
                         effectiveCustomVoicePath = latestFile!!.absolutePath
                         effectiveVoiceMode = 1
-                        android.util.Log.d("PurbChetanaTTS", "Auto-attached latest custom voice file for native routine alarm: $effectiveCustomVoicePath")
+                        android.util.Log.d("AninaiTTS", "Auto-attached latest custom/hydration voice file for native alarm: $effectiveCustomVoicePath")
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("PurbChetanaTTS", "Error finding latest custom voice file natively", e)
+                    android.util.Log.e("AninaiTTS", "Error finding latest custom voice file natively", e)
                 }
             }
 
             // Check if user already completed this reminder
             if (reminderId.isNotEmpty()) {
-                val compPrefs = context.getSharedPreferences("purb_chetana_completed_reminders", Context.MODE_PRIVATE)
+                val compPrefs = context.getSharedPreferences("aninai_completed_reminders", Context.MODE_PRIVATE)
                 if (compPrefs.getBoolean(reminderId, false)) {
-                    android.util.Log.d("PurbChetanaTTS", "Reminder $reminderId already completed. Skipping attempt $attemptCount")
+                    android.util.Log.d("AninaiTTS", "Reminder $reminderId already completed. Skipping attempt $attemptCount")
                     return
                 }
             }
@@ -157,19 +165,47 @@ class AlarmReceiver : BroadcastReceiver() {
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
             val wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "PurbChetana:AlarmWakeLock"
+                "Aninai:AlarmWakeLock"
             )
             wakeLock.acquire(15000)
 
+            // 1b. Launch FullScreenAlarmActivity to arrest screen until an option button is selected (Suppressed for Hydration)
+            if (attemptCount < 4 && !isHydration && reminderId != "hyd") {
+                try {
+                    val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        putExtra("notificationId", id)
+                        putExtra("reminderId", reminderId)
+                        putExtra("title", displayTitle)
+                        putExtra("body", displayBody)
+                        putExtra("takenLabel", takenLabel)
+                        putExtra("yetToTakeLabel", yetToTakeLabel)
+                        putExtra("isHydration", isHydration)
+                        putExtra("langCode", langCode)
+                        putExtra("medicineImagePath", medicineImagePath)
+                        putExtra("pillsCount", pillsCount)
+                    }
+                    val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
+                    val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, piFlags)
+                    try {
+                        context.startActivity(fullScreenIntent)
+                    } catch (e: Exception) {
+                        fullScreenPendingIntent.send()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("AninaiAlarm", "Error launching FullScreenAlarmActivity directly", e)
+                }
+            }
+
             // 2. Show High Priority System Notification Banner
-            showSystemNotification(context, id, reminderId, displayTitle, displayBody, takenLabel, yetToTakeLabel, isHydration, showActions)
+            showSystemNotification(context, id, reminderId, displayTitle, displayBody, takenLabel, yetToTakeLabel, isHydration, showActions, langCode, medicineImagePath, pillsCount)
 
             // 3. For 4th Notification (Caregiver Alert), play Emergency Beep Alarm Sound instead of voice!
             if (attemptCount >= 4) {
-                android.util.Log.d("PurbChetanaTTS", "Attempt 4 Caregiver Alert: Playing Emergency Beep Alarm Sound")
+                android.util.Log.d("AninaiTTS", "Attempt 4 Caregiver Alert: Playing Emergency Beep Alarm Sound")
                 playEmergencyBeepAlarmSound(context.applicationContext, wakeLock)
             } else if (effectiveVoiceMode == 1 && effectiveCustomVoicePath.isNotEmpty() && java.io.File(effectiveCustomVoicePath).exists()) {
-                android.util.Log.d("PurbChetanaTTS", "Playing Option 1 custom recorded voice audio note directly: $effectiveCustomVoicePath")
+                android.util.Log.d("AninaiTTS", "Playing Option 1 custom recorded voice audio note directly: $effectiveCustomVoicePath")
                 playCustomVoiceAudio(context.applicationContext, effectiveCustomVoicePath, wakeLock)
             } else {
                 speakNativeNotificationText(context.applicationContext, speechToDeliver, fallbackText, langCode, id, displayTitle, displayBody, wakeLock, reminderId, isClonedVoice = (effectiveVoiceMode == 2))
@@ -180,7 +216,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 val nextTriggerMs = System.currentTimeMillis() + (3600 * 1000L)
                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
                 val rearmIntent = Intent(context, AlarmReceiver::class.java).apply {
-                    setAction("com.purb_chetana.ACTION_TRIGGER_ALARM")
+                    setAction("com.aninai.ACTION_TRIGGER_ALARM")
                     putExtra("id", 999999)
                     putExtra("title", title)
                     putExtra("body", body)
@@ -189,8 +225,8 @@ class AlarmReceiver : BroadcastReceiver() {
                     putExtra("yetToTakeLabel", yetToTakeLabel)
                     putExtra("spokenText", spokenText)
                     putExtra("fallbackText", fallbackText)
-                    putExtra("customVoicePath", "")
-                    putExtra("voiceMode", 0)
+                    putExtra("customVoicePath", effectiveCustomVoicePath)
+                    putExtra("voiceMode", effectiveVoiceMode)
                     putExtra("clonedVoiceSamplePath", "")
                     putExtra("langCode", langCode)
                     putExtra("isHydration", true)
@@ -205,11 +241,11 @@ class AlarmReceiver : BroadcastReceiver() {
 
                 // Persist the re-armed hourly alarm timestamp in SharedPreferences so boot restore keeps it!
                 try {
-                    val prefs = context.getSharedPreferences("purb_chetana_native_alarms", Context.MODE_PRIVATE)
-                    val valueStr = "999999|||$nextTriggerMs|||$title|||$body|||hyd|||$takenLabel|||$yetToTakeLabel|||$spokenText|||$langCode|||true||||||0||||||$fallbackText|||false"
+                    val prefs = context.getSharedPreferences("aninai_native_alarms", Context.MODE_PRIVATE)
+                    val valueStr = "999999|||$nextTriggerMs|||$title|||$body|||hyd|||$takenLabel|||$yetToTakeLabel|||$spokenText|||$langCode|||true|||$effectiveCustomVoicePath|||$effectiveVoiceMode||||||$fallbackText|||false"
                     prefs.edit().putString("999999", valueStr).apply()
                 } catch (e: Exception) {
-                    android.util.Log.e("PurbChetanaTTS", "Error updating native hydration alarm in SharedPreferences", e)
+                    android.util.Log.e("AninaiTTS", "Error updating native hydration alarm in SharedPreferences", e)
                 }
 
                 try {
@@ -236,7 +272,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 val followUpAlarmId = baseId * 10 + nextAttempt
 
                 val followUpIntent = Intent(context, AlarmReceiver::class.java).apply {
-                    setAction("com.purb_chetana.ACTION_TRIGGER_ALARM")
+                    setAction("com.aninai.ACTION_TRIGGER_ALARM")
                     putExtra("id", followUpAlarmId)
                     putExtra("title", title)
                     putExtra("body", body)
@@ -252,6 +288,8 @@ class AlarmReceiver : BroadcastReceiver() {
                     putExtra("isHydration", false)
                     putExtra("showActions", showActions)
                     putExtra("attemptCount", nextAttempt)
+                    putExtra("medicineImagePath", medicineImagePath)
+                    putExtra("pillsCount", pillsCount)
                 }
 
                 val pendingIntent = PendingIntent.getBroadcast(
@@ -303,10 +341,10 @@ class AlarmReceiver : BroadcastReceiver() {
         } catch (_: Exception) {}
 
         activeTtsEngine = TextToSpeech(appContext) { status ->
-            android.util.Log.d("PurbChetanaTTS", "TTS initialization status: $status")
+            android.util.Log.d("AninaiTTS", "TTS initialization status: $status")
             try {
                 if (status == TextToSpeech.SUCCESS && activeTtsEngine != null) {
-                    android.util.Log.d("PurbChetanaTTS", "TTS engine initialized successfully")
+                    android.util.Log.d("AninaiTTS", "TTS engine initialized successfully")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                         val audioAttrs = AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
@@ -340,7 +378,7 @@ class AlarmReceiver : BroadcastReceiver() {
                                 }
                             }
                         } catch (e: Exception) {
-                            android.util.Log.e("PurbChetanaTTS", "Error setting ta-IN locale", e)
+                            android.util.Log.e("AninaiTTS", "Error setting ta-IN locale", e)
                         }
 
                         if (!tamilSet) {
@@ -384,11 +422,11 @@ class AlarmReceiver : BroadcastReceiver() {
                                 }
                                 if (bestVoice != null) {
                                     activeTtsEngine?.voice = bestVoice
-                                    android.util.Log.d("PurbChetanaTTS", "Selected Native Male Voice: ${bestVoice.name}")
+                                    android.util.Log.d("AninaiTTS", "Selected Native Male Voice: ${bestVoice.name}")
                                 }
                             }
                         } catch (e: Exception) {
-                            android.util.Log.e("PurbChetanaTTS", "Error selecting male voice in AlarmReceiver", e)
+                            android.util.Log.e("AninaiTTS", "Error selecting male voice in AlarmReceiver", e)
                         }
                     }
 
@@ -498,14 +536,14 @@ class AlarmReceiver : BroadcastReceiver() {
                         }
                     })
 
-                    android.util.Log.d("PurbChetanaTTS", "Speaking text: $textToSpeak")
+                    android.util.Log.d("AninaiTTS", "Speaking text: $textToSpeak")
                     activeTtsEngine?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, "AlarmTTS_$id")
                 } else {
-                    android.util.Log.e("PurbChetanaTTS", "TTS initialization failed with status: $status")
+                    android.util.Log.e("AninaiTTS", "TTS initialization failed with status: $status")
                     cleanupTts()
                 }
             } catch (e: Exception) {
-                android.util.Log.e("PurbChetanaTTS", "TTS initialization exception", e)
+                android.util.Log.e("AninaiTTS", "TTS initialization exception", e)
                 cleanupTts()
             }
         }
@@ -553,9 +591,9 @@ class AlarmReceiver : BroadcastReceiver() {
                 true
             }
             mp.start()
-            android.util.Log.d("PurbChetanaTTS", "Playing custom recorded voice audio: $voicePath")
+            android.util.Log.d("AninaiTTS", "Playing custom recorded voice audio: $voicePath")
         } catch (e: Exception) {
-            android.util.Log.e("PurbChetanaTTS", "Error playing custom recorded voice audio note", e)
+            android.util.Log.e("AninaiTTS", "Error playing custom recorded voice audio note", e)
             try {
                 if (activeWakeLock?.isHeld == true) {
                     activeWakeLock?.release()
@@ -608,9 +646,9 @@ class AlarmReceiver : BroadcastReceiver() {
                 true
             }
             mp.start()
-            android.util.Log.d("PurbChetanaTTS", "Playing grandson voice intro clip: $voicePath")
+            android.util.Log.d("AninaiTTS", "Playing grandson voice intro clip: $voicePath")
         } catch (e: Exception) {
-            android.util.Log.e("PurbChetanaTTS", "Error playing grandson voice intro clip", e)
+            android.util.Log.e("AninaiTTS", "Error playing grandson voice intro clip", e)
             speakNativeNotificationText(appContext, spokenText, fallbackText, langCode, id, title, body, wakeLock, reminderId, isClonedVoice = true)
         }
     }
@@ -632,13 +670,13 @@ class AlarmReceiver : BroadcastReceiver() {
     private fun restoreAlarmsOnBoot(context: Context) {
         try {
             val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val userJson = flutterPrefs.getString("flutter.purb_chetana_user", "") ?: ""
+            val userJson = flutterPrefs.getString("flutter.aninai_user", "") ?: ""
             if (userJson.contains("\"role\":\"caretaker\"") || userJson.contains("\"role\": \"caretaker\"")) {
-                android.util.Log.d("PurbChetanaTTS", "User is Caregiver on boot. Skipping alarm restoration.")
+                android.util.Log.d("AninaiTTS", "User is Caregiver on boot. Skipping alarm restoration.")
                 return
             }
 
-            val prefs = context.getSharedPreferences("purb_chetana_native_alarms", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences("aninai_native_alarms", Context.MODE_PRIVATE)
             val all = prefs.all
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
 
@@ -662,10 +700,12 @@ class AlarmReceiver : BroadcastReceiver() {
 
                         val fallbackText = parts.getOrNull(13) ?: ""
                         val showActions = parts.getOrNull(14)?.toBoolean() ?: (!isAppointmentReminder(reminderId, title, body))
+                        val medicineImagePath = parts.getOrNull(15) ?: ""
+                        val pillsCount = parts.getOrNull(16) ?: ""
 
                         if (triggerAtMs > System.currentTimeMillis()) {
                             val alarmIntent = Intent(context, AlarmReceiver::class.java).apply {
-                                setAction("com.purb_chetana.ACTION_TRIGGER_ALARM")
+                                setAction("com.aninai.ACTION_TRIGGER_ALARM")
                                 putExtra("id", id)
                                 putExtra("title", title)
                                 putExtra("body", body)
@@ -680,6 +720,8 @@ class AlarmReceiver : BroadcastReceiver() {
                                 putExtra("langCode", langCode)
                                 putExtra("isHydration", isHydration)
                                 putExtra("showActions", showActions)
+                                putExtra("medicineImagePath", medicineImagePath)
+                                putExtra("pillsCount", pillsCount)
                             }
                             val pendingIntent = PendingIntent.getBroadcast(
                                 context,
@@ -717,7 +759,10 @@ class AlarmReceiver : BroadcastReceiver() {
         takenLabel: String,
         yetToTakeLabel: String,
         isHydration: Boolean,
-        showActions: Boolean = true
+        showActions: Boolean = true,
+        langCode: String = "en",
+        medicineImagePath: String = "",
+        pillsCount: String = ""
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -747,6 +792,21 @@ class AlarmReceiver : BroadcastReceiver() {
         }
         val pendingIntent = PendingIntent.getActivity(context, id, launchIntent, activityFlags)
 
+        val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            putExtra("notificationId", id)
+            putExtra("reminderId", reminderId)
+            putExtra("title", title)
+            putExtra("body", body)
+            putExtra("takenLabel", takenLabel)
+            putExtra("yetToTakeLabel", yetToTakeLabel)
+            putExtra("isHydration", isHydration)
+            putExtra("langCode", langCode)
+            putExtra("medicineImagePath", medicineImagePath)
+            putExtra("pillsCount", pillsCount)
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, activityFlags)
+
         val broadcastFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         } else {
@@ -754,14 +814,14 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         val takenIntent = Intent(context, NotificationActionReceiver::class.java).apply {
-            setAction("com.purb_chetana.ACTION_TAKEN")
+            setAction("com.aninai.ACTION_TAKEN")
             putExtra("reminderId", reminderId)
             putExtra("notificationId", id)
         }
         val takenPendingIntent = PendingIntent.getBroadcast(context, id * 10 + 1, takenIntent, broadcastFlags)
 
         val yetToTakeIntent = Intent(context, NotificationActionReceiver::class.java).apply {
-            setAction("com.purb_chetana.ACTION_YET_TO_TAKE")
+            setAction("com.aninai.ACTION_YET_TO_TAKE")
             putExtra("reminderId", reminderId)
             putExtra("notificationId", id)
         }
@@ -779,16 +839,20 @@ class AlarmReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setVibrate(longArrayOf(0, 500, 250, 500))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
 
+        if (!isHydration && reminderId != "hyd") {
+            builder.setFullScreenIntent(fullScreenPendingIntent, true)
+        }
+
         val isAppointment = isAppointmentReminder(reminderId, title, body)
         if (isHydration) {
             val logWaterIntent = Intent(context, NotificationActionReceiver::class.java).apply {
-                action = "com.purb_chetana.ACTION_LOG_WATER"
+                action = "com.aninai.ACTION_LOG_WATER"
                 putExtra("reminderId", if (reminderId.isNotEmpty()) reminderId else "hyd")
                 putExtra("notificationId", id)
                 putExtra("isHydration", true)
@@ -842,7 +906,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     }
                     toneGen.release()
                 } catch (e: Exception) {
-                    android.util.Log.e("PurbChetanaTTS", "Error generating emergency beeps", e)
+                    android.util.Log.e("AninaiTTS", "Error generating emergency beeps", e)
                 }
             }.start()
 
@@ -856,9 +920,9 @@ class AlarmReceiver : BroadcastReceiver() {
                 } catch (_: Exception) {}
             }, 10000)
 
-            android.util.Log.d("PurbChetanaTTS", "Played Emergency Beep Alarm Sound for Attempt 4 Caregiver Alert")
+            android.util.Log.d("AninaiTTS", "Played Emergency Beep Alarm Sound for Attempt 4 Caregiver Alert")
         } catch (e: Exception) {
-            android.util.Log.e("PurbChetanaTTS", "Error playing emergency beep alarm sound", e)
+            android.util.Log.e("AninaiTTS", "Error playing emergency beep alarm sound", e)
             try {
                 if (activeWakeLock?.isHeld == true) {
                     activeWakeLock?.release()

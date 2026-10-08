@@ -22,14 +22,26 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.stepdetector" android:required="false" />
 
     <application
-        android:label="Purb Chetana"
+        android:label="Aninai"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
+        <activity
+            android:name=".FullScreenAlarmActivity"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="com.example.smriti_jyoti.alarm"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -62,9 +74,9 @@
 
         <receiver android:name=".NotificationActionReceiver" android:exported="false">
             <intent-filter>
-                <action android:name="com.purb_chetana.ACTION_TAKEN" />
-                <action android:name="com.purb_chetana.ACTION_YET_TO_TAKE" />
-                <action android:name="com.purb_chetana.ACTION_LOG_WATER" />
+                <action android:name="com.aninai.ACTION_TAKEN" />
+                <action android:name="com.aninai.ACTION_YET_TO_TAKE" />
+                <action android:name="com.aninai.ACTION_LOG_WATER" />
             </intent-filter>
         </receiver>
 
@@ -72,7 +84,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.purb_chetana.ACTION_TRIGGER_ALARM" />
+                <action android:name="com.aninai.ACTION_TRIGGER_ALARM" />
             </intent-filter>
         </receiver>
 

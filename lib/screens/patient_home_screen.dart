@@ -1,3 +1,4 @@
+import 'schedule_reminders_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/i18n_service.dart';
@@ -11,6 +12,7 @@ import '../widgets/elder_card.dart';
 import '../widgets/elder_button.dart';
 import '../widgets/elder_location_sharing_card.dart';
 import '../widgets/elder_step_tracker_card.dart';
+import '../widgets/battery_status_widget.dart';
 import '../services/elder_location_service.dart';
 import '../services/step_tracker_service.dart';
 
@@ -99,10 +101,18 @@ class PatientHomeScreen extends StatelessWidget {
  child: Column(
  crossAxisAlignment: CrossAxisAlignment.start,
  children: [
- Text(
+ Row(
+ mainAxisAlignment: MainAxisAlignment.spaceBetween,
+ children: [
+ Expanded(
+ child: Text(
  '${i18n.translate("todayDate")}, 8 ${i18n.translate("septemberDate")} 2026',
- style: TextStyle(color: Color(0xFF1B2824), fontSize: 13, fontWeight: FontWeight.w600),
+ style: const TextStyle(color: Color(0xFF1B2824), fontSize: 13, fontWeight: FontWeight.w600),
  softWrap: true,
+ ),
+ ),
+ const BatteryStatusWidget(),
+ ],
  ),
  SizedBox(height: 10),
  Text(
@@ -344,7 +354,10 @@ class PatientHomeScreen extends StatelessWidget {
  if (schedule.reminders.isEmpty) ...[
  Text(i18n.translate('noRemindersSet'), style: TextStyle(fontSize: 12, color: Colors.grey)),
  ] else ...[
- ...schedule.reminders.take(3).map((r) => Container(
+ ...schedule.reminders.take(3).map((r) => InkWell(
+ onTap: () => showEditReminderDialog(context, r, i18n, schedule),
+ borderRadius: BorderRadius.circular(14),
+ child: Container(
  margin: const EdgeInsets.only(bottom: 6),
  padding: const EdgeInsets.all(10),
  decoration: BoxDecoration(
@@ -365,12 +378,27 @@ class PatientHomeScreen extends StatelessWidget {
  ],
  ),
  ),
+ const SizedBox(width: 4),
+ IconButton(
+ padding: EdgeInsets.zero,
+ constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+ icon: const Icon(Icons.edit, color: Color(0xFF0284C7), size: 20),
+ onPressed: () => showEditReminderDialog(context, r, i18n, schedule),
+ ),
+ IconButton(
+ padding: EdgeInsets.zero,
+ constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+ icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+ onPressed: () => confirmAndDeleteReminderDialog(context, r, i18n, schedule),
+ ),
+ const SizedBox(width: 4),
  Icon(
  r.isCompleted ? Icons.check_circle : Icons.circle_outlined,
  color: r.isCompleted ? const Color(0xFF23B39B) : Colors.grey,
  size: 24,
  ),
  ],
+ ),
  ),
  )).toList(),
  ],

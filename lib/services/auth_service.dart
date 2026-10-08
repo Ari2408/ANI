@@ -104,12 +104,12 @@ class AuthService extends ChangeNotifier {
   Future<void> loadState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userRaw = prefs.getString('purb_chetana_user');
+      final userRaw = prefs.getString('aninai_user');
       if (userRaw != null) {
         _currentUser = UserAccount.fromJson(jsonDecode(userRaw));
       }
 
-      final regRaw = prefs.getString('purb_chetana_reg_users');
+      final regRaw = prefs.getString('aninai_reg_users');
       if (regRaw != null) {
         final decoded = jsonDecode(regRaw) as Map<String, dynamic>;
         decoded.forEach((key, val) {
@@ -117,7 +117,7 @@ class AuthService extends ChangeNotifier {
         });
       }
 
-      final eldersRaw = prefs.getString('purb_chetana_elders');
+      final eldersRaw = prefs.getString('aninai_elders');
       if (eldersRaw != null) {
         final decoded = jsonDecode(eldersRaw) as Map<String, dynamic>;
         decoded.forEach((key, val) {
@@ -198,14 +198,14 @@ class AuthService extends ChangeNotifier {
       NotificationService.isCaretakerMode = isCaretaker;
       final prefs = await SharedPreferences.getInstance();
       if (_currentUser != null) {
-        await prefs.setString('purb_chetana_user', jsonEncode(_currentUser!.toJson()));
+        await prefs.setString('aninai_user', jsonEncode(_currentUser!.toJson()));
       } else {
-        await prefs.remove('purb_chetana_user');
+        await prefs.remove('aninai_user');
       }
 
       final regMap = _registeredUsers.map((k, v) => MapEntry(k, v.toJson()));
-      await prefs.setString('purb_chetana_reg_users', jsonEncode(regMap));
-      await prefs.setString('purb_chetana_elders', jsonEncode(_elderProfiles));
+      await prefs.setString('aninai_reg_users', jsonEncode(regMap));
+      await prefs.setString('aninai_elders', jsonEncode(_elderProfiles));
     } catch (e) {
       print('AuthService save error: $e');
     }

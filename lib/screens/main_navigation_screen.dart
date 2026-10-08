@@ -10,6 +10,7 @@ import 'schedule_reminders_screen.dart';
 import 'memory_lane_screen.dart';
 import 'caregiver_dashboard_screen.dart';
 import 'elder_location_screen.dart';
+import '../widgets/battery_status_widget.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({Key? key}) : super(key: key);
@@ -297,7 +298,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         elevation: 0,
         title: Row(
           children: [
-            // Custom Purb Chetana Mascot Logo
+            // Custom Aninai Mascot Logo
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.asset(
@@ -319,6 +320,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ],
         ),
         actions: [
+          // Battery Level Status Indicator
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+            child: BatteryStatusWidget(),
+          ),
+
           // Instant Refresh App Data Button
           IconButton(
             icon: const Icon(Icons.refresh, color: Color(0xFF1B2824)),

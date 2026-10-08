@@ -17,7 +17,7 @@ class CloudSyncService extends ChangeNotifier {
  ];
 
  static const List<String> _kvEndpoints = [
-'https://kvdb.io/PurbChetanaApp2026KeyValStore',
+'https://kvdb.io/AninaiApp2026KeyValStore',
  ];
 
  final HttpClient _client = HttpClient()
@@ -1135,6 +1135,150 @@ class CloudSyncService extends ChangeNotifier {
  _sseActivitySubscription = null;
  _activeSseActivityElderId = '';
  _activeActivityCallback = null;
+ }
+
+ /// Push SOS Alert when Elder misses 3 reminders (Attempt 4)
+ Future<bool> pushSosAlertCloud(String elderId, {required String title, required String message, String reminderId = ''}) async {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty) return false;
+
+ try {
+ final now = DateTime.now().toUtc();
+ final nowMs = now.millisecondsSinceEpoch;
+ final payloadMap = {
+ 'elderId': targetId,
+ 'title': title,
+ 'message': message,
+ 'reminderId': reminderId,
+ 'active': true,
+ 'timestamp': nowMs,
+ 'updatedAt': now.toIso8601String(),
+ };
+
+ _inMemoryCache['sos_$targetId'] = payloadMap;
+ final prefs = await SharedPreferences.getInstance();
+ final payload = jsonEncode(payloadMap);
+ await prefs.setString('cloud_sos_$targetId', payload);
+
+ debugPrint('CLOUD SOS PUSH: Elder=$targetId, title=$title');
+
+ bool anySuccess = false;
+ for (final fb in _firebaseEndpoints) {
+ try {
+ final url = Uri.parse('$fb/sos/$targetId.json');
+ final request = await _client.putUrl(url);
+ request.headers.contentType = ContentType.json;
+ request.write(payload);
+ final response = await request.close();
+ await response.drain();
+ if (response.statusCode == 200) anySuccess = true;
+ } catch (e) {
+ debugPrint('CLOUD SOS PUSH Error ($fb): $e');
+ }
+ }
+
+ for (final kv in _kvEndpoints) {
+ try {
+ final url = Uri.parse('$kv/sos_$targetId');
+ final request = await _client.putUrl(url);
+ request.headers.contentType = ContentType.json;
+ request.write(payload);
+ final response = await request.close();
+ await response.drain();
+ if (response.statusCode == 200) anySuccess = true;
+ } catch (_) {}
+ }
+
+ return anySuccess;
+ } catch (e) {
+ debugPrint('CloudSync push sos error: $e');
+ return false;
+ }
+ }
+
+ /// Pull SOS Alert from Cloud Relay for Caregiver (/sos/NER-XXXX.json)
+ Future<Map<String, dynamic>?> pullSosAlertCloud(String elderId) async {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty) return null;
+
+ final prefs = await SharedPreferences.getInstance();
+
+ for (final fb in _firebaseEndpoints) {
+ try {
+ final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+ final url = Uri.parse('$fb/sos/$targetId.json?ts=$cacheBuster');
+ final request = await _client.getUrl(url);
+ request.headers.add('Cache-Control', 'no-cache, no-store, must-revalidate');
+ request.headers.add('Pragma', 'no-cache');
+ final response = await request.close();
+ final body = await response.transform(utf8.decoder).join();
+
+ if (response.statusCode == 200 && body.isNotEmpty && body != 'null') {
+ final decoded = jsonDecode(body) as Map<String, dynamic>;
+ _inMemoryCache['sos_$targetId'] = decoded;
+ await prefs.setString('cloud_sos_$targetId', body);
+ return decoded;
+ }
+ } catch (e) {
+ debugPrint('CLOUD SOS PULL Error ($fb): $e');
+ }
+ }
+
+ for (final kv in _kvEndpoints) {
+ try {
+ final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+ final url = Uri.parse('$kv/sos_$targetId?ts=$cacheBuster');
+ final request = await _client.getUrl(url);
+ request.headers.add('Cache-Control', 'no-cache, no-store, must-revalidate');
+ final response = await request.close();
+ final body = await response.transform(utf8.decoder).join();
+
+ if (response.statusCode == 200 && body.isNotEmpty && body != 'null') {
+ final decoded = jsonDecode(body) as Map<String, dynamic>;
+ _inMemoryCache['sos_$targetId'] = decoded;
+ await prefs.setString('cloud_sos_$targetId', body);
+ return decoded;
+ }
+ } catch (_) {}
+ }
+
+ final localRaw = prefs.getString('cloud_sos_$targetId');
+ if (localRaw != null && localRaw.isNotEmpty) {
+ return jsonDecode(localRaw) as Map<String, dynamic>;
+ }
+ return _inMemoryCache['sos_$targetId'];
+ }
+
+ /// Clear active SOS Alert from Cloud Relay
+ Future<void> clearSosAlertCloud(String elderId) async {
+ final targetId = cleanId(elderId);
+ if (targetId.isEmpty) return;
+
+ try {
+ _inMemoryCache.remove('sos_$targetId');
+ final prefs = await SharedPreferences.getInstance();
+ await prefs.remove('cloud_sos_$targetId');
+
+ for (final fb in _firebaseEndpoints) {
+ try {
+ final url = Uri.parse('$fb/sos/$targetId.json');
+ final request = await _client.deleteUrl(url);
+ final response = await request.close();
+ await response.drain();
+ } catch (_) {}
+ }
+
+ for (final kv in _kvEndpoints) {
+ try {
+ final url = Uri.parse('$kv/sos_$targetId');
+ final request = await _client.deleteUrl(url);
+ final response = await request.close();
+ await response.drain();
+ } catch (_) {}
+ }
+ } catch (e) {
+ debugPrint('CloudSync clear sos error: $e');
+ }
  }
 }
 

@@ -30,9 +30,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra("title") ?: ""
         val isHydrationIntent = intent.getBooleanExtra("isHydration", false) || action.contains("ACTION_LOG_WATER") || reminderId == "hyd" || reminderId.startsWith("hyd_")
         val isRoutine = reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine") || title.contains("Daily Activity") || title.contains("தினசரி") || title.contains("dinasari")
+        val isAppt = reminderId.startsWith("apt_") || reminderId.contains("apt") || reminderId.contains("appointment") || title.contains("Appointment") || title.contains("சந்திப்பு") || title.contains("sandhippu") || title.contains("Doctor")
 
-        if (action == "com.purb_chetana.ACTION_TAKEN" && reminderId.isNotEmpty() && !isHydrationIntent) {
-            val compPrefs = context.getSharedPreferences("purb_chetana_completed_reminders", Context.MODE_PRIVATE)
+        if (action == "com.aninai.ACTION_TAKEN" && reminderId.isNotEmpty() && !isHydrationIntent) {
+            val compPrefs = context.getSharedPreferences("aninai_completed_reminders", Context.MODE_PRIVATE)
             compPrefs.edit().putBoolean(reminderId, true).apply()
 
             // Cancel scheduled alarm and follow-up 1-minute retry alarms for attempt 2 and attempt 3
@@ -42,7 +43,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val alarmIds = listOf(baseId, baseId * 10 + 2, baseId * 10 + 3)
                 for (retryId in alarmIds) {
                     val cancelIntent = Intent(context, AlarmReceiver::class.java).apply {
-                        setAction("com.purb_chetana.ACTION_TRIGGER_ALARM")
+                        setAction("com.aninai.ACTION_TRIGGER_ALARM")
                     }
                     val pi = PendingIntent.getBroadcast(
                         context,
@@ -56,7 +57,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
 
         // Speak native TTS response
-        speakNativeActionVoice(context.applicationContext, isRoutine, isHydrationIntent, action)
+        speakNativeActionVoice(context.applicationContext, isRoutine, isAppt, isHydrationIntent, action)
 
         if (MainActivity.activityInstance != null) {
             MainActivity.sendNotificationActionToFlutter(reminderId, action)
@@ -72,10 +73,16 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun speakNativeActionVoice(appContext: Context, isRoutine: Boolean, isHydration: Boolean, action: String) {
-        val isTaken = action.contains("ACTION_TAKEN") || action.contains("ACTION_STARTED") || action.contains("ACTION_LOG_WATER")
+    private fun speakNativeActionVoice(appContext: Context, isRoutine: Boolean, isAppt: Boolean, isHydration: Boolean, action: String) {
+        val isTaken = action.contains("ACTION_TAKEN") || action.contains("ACTION_STARTED") || action.contains("ACTION_LOG_WATER") || action.contains("ACTION_ATTENDED")
         val textToSpeak = if (isHydration || action.contains("ACTION_LOG_WATER")) {
             "Great job! 1 glass of water logged. Stay hydrated and healthy!"
+        } else if (isAppt) {
+            if (isTaken) {
+                "Great job! Your medical appointment is marked as attended. Take care of your health!"
+            } else {
+                "Your medical appointment is marked as not attended. Please reschedule with your doctor if needed."
+            }
         } else if (isRoutine) {
             if (isTaken) {
                 "Great job! Completing your daily activity routine keeps you active and healthy!"

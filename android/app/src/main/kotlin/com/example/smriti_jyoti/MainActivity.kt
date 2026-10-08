@@ -15,10 +15,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.purb_chetana/notifications"
-    private val STEP_CHANNEL = "com.purb_chetana/step_tracker"
-    private val NOTIFICATION_CHANNEL_ID = "purb_chetana_reminders_v4"
-    private val NOTIFICATION_CHANNEL_NAME = "Purb Chetana Reminders"
+    private val CHANNEL = "com.aninai/notifications"
+    private val STEP_CHANNEL = "com.aninai/step_tracker"
+    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v4"
+    private val NOTIFICATION_CHANNEL_NAME = "Aninai Reminders"
     private var pendingActivityPermissionResult: MethodChannel.Result? = null
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -107,7 +107,7 @@ class MainActivity : FlutterActivity() {
         mChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "showNotification" -> {
-                    val title = call.argument<String>("title") ?: "Purb Chetana Reminder"
+                    val title = call.argument<String>("title") ?: "Aninai Reminder"
                     val body = call.argument<String>("body") ?: "You have a scheduled reminder."
                     val id = call.argument<Int>("id") ?: (System.currentTimeMillis() % 100000).toInt()
                     val reminderId = call.argument<String>("reminderId") ?: ""
@@ -115,8 +115,11 @@ class MainActivity : FlutterActivity() {
                     val yetToTakeLabel = call.argument<String>("yetToTakeLabel") ?: "Yet to Take"
                     val isHydration = call.argument<Boolean>("isHydration") ?: false
                     val showActions = call.argument<Boolean>("showActions") ?: true
+                    val medicineImagePath = call.argument<String>("medicineImagePath") ?: ""
+                    val pillsCount = call.argument<String>("pillsCount") ?: ""
+                    val langCode = call.argument<String>("langCode") ?: "en"
 
-                    showSystemNotification(id, reminderId, title, body, takenLabel, yetToTakeLabel, isHydration, showActions)
+                    showSystemNotification(id, reminderId, title, body, takenLabel, yetToTakeLabel, isHydration, showActions, medicineImagePath, pillsCount, langCode)
                     result.success(true)
                 }
                 "requestPermission" -> {
@@ -141,9 +144,11 @@ class MainActivity : FlutterActivity() {
                     val langCode = call.argument<String>("langCode") ?: "en"
                     val isHydration = call.argument<Boolean>("isHydration") ?: false
                     val showActions = call.argument<Boolean>("showActions") ?: true
+                    val medicineImagePath = call.argument<String>("medicineImagePath") ?: ""
+                    val pillsCount = call.argument<String>("pillsCount") ?: ""
 
                     if (id != 0 && triggerAtMs > System.currentTimeMillis()) {
-                        scheduleNativeAlarm(id, triggerAtMs, title, body, reminderId, takenLabel, yetToTakeLabel, spokenText, fallbackText, customVoicePath, voiceMode, clonedVoiceSamplePath, langCode, isHydration, showActions)
+                        scheduleNativeAlarm(id, triggerAtMs, title, body, reminderId, takenLabel, yetToTakeLabel, spokenText, fallbackText, customVoicePath, voiceMode, clonedVoiceSamplePath, langCode, isHydration, showActions, medicineImagePath, pillsCount)
                     }
                     result.success(true)
                 }
@@ -258,11 +263,15 @@ class MainActivity : FlutterActivity() {
         clonedVoiceSamplePath: String,
         langCode: String,
         isHydration: Boolean,
-        showActions: Boolean = true
+        showActions: Boolean = true,
+        medicineImagePath: String = "",
+        pillsCount: String = ""
     ) {
         try {
             val isRoutine = reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine") ||
                     title.contains("Daily Activity") || title.contains("தினசரி") || title.contains("dinasari")
+            val isAppt = reminderId.startsWith("apt_") || reminderId.contains("apt") || reminderId.contains("appointment") ||
+                    title.contains("Appointment") || title.contains("சந்திப்பு") || title.contains("sandhippu") || title.contains("Doctor")
             val effectiveCustomVoicePath = customVoicePath
             var effectiveVoiceMode = voiceMode
             if (effectiveCustomVoicePath.isNotEmpty() && java.io.File(effectiveCustomVoicePath).exists() && java.io.File(effectiveCustomVoicePath).length() > 0) {
@@ -270,27 +279,29 @@ class MainActivity : FlutterActivity() {
             }
             val effectiveClonedVoiceSamplePath = clonedVoiceSamplePath
 
-            val finalTakenLabel = if (takenLabel.isEmpty() || takenLabel == "startedBtn" || takenLabel == "takenBtn") {
-                if (isRoutine) (if (langCode == "ta") "தொடங்கப்பட்டது" else "Started")
+            val finalTakenLabel = if (takenLabel.isEmpty() || takenLabel == "startedBtn" || takenLabel == "takenBtn" || takenLabel == "attendedBtn") {
+                if (isAppt) (if (langCode == "ta") "சென்றேன்" else "Attended")
+                else if (isRoutine) (if (langCode == "ta") "தொடங்கப்பட்டது" else "Started")
                 else (if (langCode == "ta") "எடுத்துக்கொண்டேன்" else "Taken")
             } else {
                 takenLabel
             }
 
-            val finalYetToTakeLabel = if (yetToTakeLabel.isEmpty() || yetToTakeLabel == "notStartedBtn" || yetToTakeLabel == "yetToTakeBtn") {
-                if (isRoutine) (if (langCode == "ta") "தொடங்கவில்லை" else "Not Started")
+            val finalYetToTakeLabel = if (yetToTakeLabel.isEmpty() || yetToTakeLabel == "notStartedBtn" || yetToTakeLabel == "yetToTakeBtn" || yetToTakeLabel == "notAttendedBtn") {
+                if (isAppt) (if (langCode == "ta") "செல்லவில்லை" else "Not Attended")
+                else if (isRoutine) (if (langCode == "ta") "தொடங்கவில்லை" else "Not Started")
                 else (if (langCode == "ta") "எடுக்கவில்லை" else "Yet to Take")
             } else {
                 yetToTakeLabel
             }
 
-            val prefs = getSharedPreferences("purb_chetana_native_alarms", Context.MODE_PRIVATE)
-            val valueStr = "$id|||$triggerAtMs|||$title|||$body|||$reminderId|||$finalTakenLabel|||$finalYetToTakeLabel|||$spokenText|||$langCode|||$isHydration|||$effectiveCustomVoicePath|||$effectiveVoiceMode|||$effectiveClonedVoiceSamplePath|||$fallbackText|||$showActions"
+            val prefs = getSharedPreferences("aninai_native_alarms", Context.MODE_PRIVATE)
+            val valueStr = "$id|||$triggerAtMs|||$title|||$body|||$reminderId|||$finalTakenLabel|||$finalYetToTakeLabel|||$spokenText|||$langCode|||$isHydration|||$effectiveCustomVoicePath|||$effectiveVoiceMode|||$effectiveClonedVoiceSamplePath|||$fallbackText|||$showActions|||$medicineImagePath|||$pillsCount"
             prefs.edit().putString(id.toString(), valueStr).apply()
 
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             val intent = Intent(this, AlarmReceiver::class.java).apply {
-                action = "com.purb_chetana.ACTION_TRIGGER_ALARM"
+                action = "com.aninai.ACTION_TRIGGER_ALARM"
                 putExtra("id", id)
                 putExtra("title", title)
                 putExtra("body", body)
@@ -305,6 +316,8 @@ class MainActivity : FlutterActivity() {
                 putExtra("langCode", langCode)
                 putExtra("isHydration", isHydration)
                 putExtra("showActions", showActions)
+                putExtra("medicineImagePath", medicineImagePath)
+                putExtra("pillsCount", pillsCount)
             }
 
             val pendingIntent = PendingIntent.getBroadcast(
@@ -351,12 +364,12 @@ class MainActivity : FlutterActivity() {
 
     private fun cancelNativeAlarm(id: Int) {
         try {
-            val prefs = getSharedPreferences("purb_chetana_native_alarms", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("aninai_native_alarms", Context.MODE_PRIVATE)
             prefs.edit().remove(id.toString()).apply()
 
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             val intent = Intent(this, AlarmReceiver::class.java).apply {
-                action = "com.purb_chetana.ACTION_TRIGGER_ALARM"
+                action = "com.aninai.ACTION_TRIGGER_ALARM"
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 this,
@@ -373,9 +386,9 @@ class MainActivity : FlutterActivity() {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
             try {
-                notificationManager.deleteNotificationChannel("purb_chetana_reminders")
-                notificationManager.deleteNotificationChannel("purb_chetana_reminders_v2")
-                notificationManager.deleteNotificationChannel("purb_chetana_reminders_v3")
+                notificationManager.deleteNotificationChannel("aninai_reminders")
+                notificationManager.deleteNotificationChannel("aninai_reminders_v2")
+                notificationManager.deleteNotificationChannel("aninai_reminders_v3")
             } catch (_: Exception) {}
 
             val channel = NotificationChannel(
@@ -402,7 +415,10 @@ class MainActivity : FlutterActivity() {
         takenLabel: String,
         yetToTakeLabel: String,
         isHydration: Boolean,
-        showActions: Boolean = true
+        showActions: Boolean = true,
+        medicineImagePath: String = "",
+        pillsCount: String = "",
+        langCode: String = "en"
     ) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -418,6 +434,21 @@ class MainActivity : FlutterActivity() {
         }
         val pendingIntent = PendingIntent.getActivity(this, id, intent, activityFlags)
 
+        val fullScreenIntent = Intent(this, FullScreenAlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            putExtra("notificationId", id)
+            putExtra("reminderId", reminderId)
+            putExtra("title", title)
+            putExtra("body", body)
+            putExtra("takenLabel", takenLabel)
+            putExtra("yetToTakeLabel", yetToTakeLabel)
+            putExtra("isHydration", isHydration)
+            putExtra("langCode", langCode)
+            putExtra("medicineImagePath", medicineImagePath)
+            putExtra("pillsCount", pillsCount)
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(this, id * 10 + 9, fullScreenIntent, activityFlags)
+
         val broadcastFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         } else {
@@ -426,7 +457,7 @@ class MainActivity : FlutterActivity() {
 
         // Action 1: TAKEN (Localized)
         val takenIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-            action = "com.purb_chetana.ACTION_TAKEN"
+            action = "com.aninai.ACTION_TAKEN"
             putExtra("reminderId", reminderId)
             putExtra("notificationId", id)
         }
@@ -434,7 +465,7 @@ class MainActivity : FlutterActivity() {
 
         // Action 2: YET TO TAKE (Localized)
         val yetToTakeIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-            action = "com.purb_chetana.ACTION_YET_TO_TAKE"
+            action = "com.aninai.ACTION_YET_TO_TAKE"
             putExtra("reminderId", reminderId)
             putExtra("notificationId", id)
         }
@@ -452,16 +483,27 @@ class MainActivity : FlutterActivity() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setVibrate(longArrayOf(0, 500, 250, 500))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
 
+        if (!isHydration && reminderId != "hyd") {
+            builder.setFullScreenIntent(fullScreenPendingIntent, true)
+            try {
+                startActivity(fullScreenIntent)
+            } catch (e: Exception) {
+                try {
+                    fullScreenPendingIntent.send()
+                } catch (_: Exception) {}
+            }
+        }
+
         val isAppointment = isAppointmentReminder(reminderId, title, body)
         if (isHydration) {
             val logWaterIntent = Intent(this, NotificationActionReceiver::class.java).apply {
-                action = "com.purb_chetana.ACTION_LOG_WATER"
+                action = "com.aninai.ACTION_LOG_WATER"
                 putExtra("reminderId", if (reminderId.isNotEmpty()) reminderId else "hyd")
                 putExtra("notificationId", id)
                 putExtra("isHydration", true)
@@ -537,7 +579,7 @@ class MainActivity : FlutterActivity() {
                     }
                     toneGen.release()
                 } catch (e: Exception) {
-                    android.util.Log.e("PurbChetanaTTS", "Error generating emergency beep tones", e)
+                    android.util.Log.e("AninaiTTS", "Error generating emergency beep tones", e)
                 }
             }.start()
 
@@ -545,14 +587,14 @@ class MainActivity : FlutterActivity() {
                 try { ringtone?.stop() } catch (_: Exception) {}
             }, 10000)
 
-            android.util.Log.d("PurbChetanaTTS", "Played Emergency Beep Alarm Sound for Caregiver Alert")
+            android.util.Log.d("AninaiTTS", "Played Emergency Beep Alarm Sound for Caregiver Alert")
         } catch (e: Exception) {
-            android.util.Log.e("PurbChetanaTTS", "Error playing emergency beep alarm sound", e)
+            android.util.Log.e("AninaiTTS", "Error playing emergency beep alarm sound", e)
         }
     }
 
     private val LOCATION_NOTIFICATION_ID = 99999
-    private val LOCATION_CHANNEL_ID = "purb_chetana_location_tracking"
+    private val LOCATION_CHANNEL_ID = "aninai_location_tracking"
     private val LOCATION_CHANNEL_NAME = "Elder Location Tracking"
 
     private fun showLocationSharingNotification(title: String, body: String) {
@@ -596,7 +638,7 @@ class MainActivity : FlutterActivity() {
 
             notificationManager.notify(LOCATION_NOTIFICATION_ID, builder.build())
         } catch (e: Exception) {
-            android.util.Log.e("PurbChetanaLocation", "Error showing location notification", e)
+            android.util.Log.e("AninaiLocation", "Error showing location notification", e)
         }
     }
 

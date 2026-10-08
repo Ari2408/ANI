@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'voice_cloning_service.dart';
 
 class NotificationService {
-  static const MethodChannel _channel = MethodChannel('com.purb_chetana/notifications');
+  static const MethodChannel _channel = MethodChannel('com.aninai/notifications');
   static final FlutterTts _tts = FlutterTts();
   static final AudioPlayer _customVoicePlayer = AudioPlayer();
   static bool _ttsInitialized = false;
@@ -43,7 +43,11 @@ class NotificationService {
         _ttsInitialized = true;
       }
     } catch (e) {
-      debugPrint('NotificationService init TTS error: $e');
+      if (e.toString().contains('MissingPluginException')) {
+        debugPrint('TTS Plugin: Requires cold app launch to bind platform channel (handled gracefully).');
+      } else {
+        debugPrint('NotificationService init TTS error: $e');
+      }
     }
   }
 
@@ -155,7 +159,7 @@ class NotificationService {
         File? latest;
         for (var d in searchDirs) {
           if (d.existsSync()) {
-            final files = d.listSync().whereType<File>().where((f) => (f.path.contains('custom_reminder_voice_') || f.path.contains('meal_voice_')) && f.path.endsWith('.m4a') && f.lengthSync() > 0);
+            final files = d.listSync().whereType<File>().where((f) => (f.path.contains('hydration_voice_') || f.path.contains('custom_reminder_voice_') || f.path.contains('meal_voice_')) && f.path.endsWith('.m4a') && f.lengthSync() > 0);
             for (var f in files) {
               if (latest == null || f.lastModifiedSync().isAfter(latest.lastModifiedSync())) {
                 latest = f;
@@ -343,6 +347,8 @@ class NotificationService {
     VoidCallback? onAction,
     VoidCallback? onTaken,
     VoidCallback? onYetToTake,
+    String medicineImagePath = '',
+    String pillsCount = '',
   }) async {
     final int notifId = DateTime.now().millisecondsSinceEpoch % 100000;
     final bool isRoutine = reminderId.startsWith('act_') ||
@@ -368,6 +374,9 @@ class NotificationService {
         'customVoicePath': effectiveCustomVoicePath,
         'voiceMode': effectiveVoiceMode,
         'clonedVoiceSamplePath': effectiveClonedVoiceSamplePath,
+        'medicineImagePath': medicineImagePath,
+        'pillsCount': pillsCount,
+        'langCode': langCode,
       });
     } catch (_) {}
 
@@ -409,6 +418,8 @@ class NotificationService {
     String langCode = 'en',
     bool isHydration = false,
     bool showActions = true,
+    String medicineImagePath = '',
+    String pillsCount = '',
   }) async {
     final bool isRoutine = reminderId.startsWith('act_') ||
         reminderId.contains('act') ||
@@ -437,6 +448,8 @@ class NotificationService {
         'langCode': langCode,
         'isHydration': isHydration,
         'showActions': showActions,
+        'medicineImagePath': medicineImagePath,
+        'pillsCount': pillsCount,
       });
     } catch (_) {}
   }

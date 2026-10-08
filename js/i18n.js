@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Multilingual Localization Engine (i18n) - Purb Chetana
+   Multilingual Localization Engine (i18n) - Aninai
    Supports Tamil (தமிழ்) + 7 North Eastern Region Languages + English
    ========================================================================== */
 
@@ -133,14 +133,14 @@ const i18n = {
     },
 
     en: {
-      appName: 'Purb Chetana',
+      appName: 'Aninai',
       tagline: 'AI Elderly Cognitive & Memory Assistant',
       home: 'Home',
       games: 'Games',
       schedule: 'Schedule',
       memoryLane: 'Memory Lane',
       caregiver: 'Caregiver',
-      welcomeMessage: 'Welcome to Purb Chetana! Wishing you an active day.',
+      welcomeMessage: 'Welcome to Aninai ! Wishing you an active day.',
       cognitiveHealthIndex: 'Cognitive Health Index',
       dailyGames: 'Today\'s Cognitive Exercises',
       gamesSection: '🎮 Cognitive Games (4 Games)',
@@ -163,7 +163,7 @@ const i18n = {
       takeMedicine: 'Time to Take Medicine',
       hydrationGoal: 'Daily Hydration Target',
       glasses: 'glasses',
-      voiceAssistantPrompt: 'Purb Chetana Assistant: Say "Play Game" or "Show Schedule".',
+      voiceAssistantPrompt: 'Aninai Assistant: Say "Play Game" or "Show Schedule".',
       riskLow: 'Stable Cognitive Health (Low Risk)',
       riskModerate: 'Mild Latency Alert (Moderate Risk)',
       riskHigh: 'Clinical Consult Advised (High Risk)',

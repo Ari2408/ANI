@@ -13,7 +13,7 @@ enum StepTrackerSyncStatus {
 }
 
 class StepTrackerService extends ChangeNotifier with WidgetsBindingObserver {
-  static const MethodChannel _nativeChannel = MethodChannel('com.purb_chetana/step_tracker');
+  static const MethodChannel _nativeChannel = MethodChannel('com.aninai/step_tracker');
 
   bool _isSensorAvailable = true;
   bool _hasPermission = false;

@@ -15,6 +15,8 @@ import'cloud_sync_service.dart';
 class ScheduleService extends ChangeNotifier {
  double _hydrationTargetLiters = 2.0; // Default: 2.0 Liters (8 glasses) for elder hydration
  int _hydrationCurrentGlasses = 0;
+ int _hydrationVoiceMode = 0; // 0: Standard AI Voice, 1: Voice Recorded Note
+ String? _hydrationCustomVoicePath;
 
  final List<ReminderItem> _reminders = [];
  final Map<String, Timer> _scheduledTimers = {};
@@ -27,6 +29,7 @@ class ScheduleService extends ChangeNotifier {
  bool _isAutoSyncRunning = false;
  String _currentElderId ='';
  String _lastSavedJson ='';
+ String? _lastTriggeredSosKey;
 
  final CloudSyncService _cloudSync = CloudSyncService();
 
@@ -176,7 +179,7 @@ class ScheduleService extends ChangeNotifier {
 
  final prefs = await SharedPreferences.getInstance();
  if (_currentElderId.isNotEmpty) {
- await prefs.remove('purb_chetana_schedules_$_currentElderId');
+ await prefs.remove('aninai_schedules_$_currentElderId');
  await prefs.remove('cloud_schedules_$_currentElderId');
  }
 
@@ -213,7 +216,7 @@ class ScheduleService extends ChangeNotifier {
 
  await HiveService.init();
  final prefs = await SharedPreferences.getInstance();
- final key ='purb_chetana_schedules_$targetId';
+ final key ='aninai_schedules_$targetId';
  String? raw = prefs.getString(key);
 
  _reminders.clear();
@@ -236,14 +239,16 @@ class ScheduleService extends ChangeNotifier {
  }
 
  if (targetId.isNotEmpty) {
- final hydKey ='purb_chetana_hydration_$targetId';
+ final hydKey ='aninai_hydration_$targetId';
  final hydState = HiveService.getHydrationStateForElder(targetId);
  _hydrationTargetLiters = prefs.getDouble(hydKey) ?? (hydState?['targetLiters'] as num?)?.toDouble() ?? 2.0;
  _hydrationCurrentGlasses = prefs.getInt('${hydKey}_glasses') ?? (hydState?['currentGlasses'] as num?)?.toInt() ?? 0;
+ _hydrationVoiceMode = prefs.getInt('${hydKey}_voiceMode') ?? 0;
+ _hydrationCustomVoicePath = prefs.getString('${hydKey}_customVoicePath');
 
- _breakfastVoicePath = prefs.getString('purb_chetana_meal_voice_breakfast_$targetId') ?? prefs.getString('purb_chetana_meal_voice_breakfast');
- _lunchVoicePath = prefs.getString('purb_chetana_meal_voice_lunch_$targetId') ?? prefs.getString('purb_chetana_meal_voice_lunch');
- _dinnerVoicePath = prefs.getString('purb_chetana_meal_voice_dinner_$targetId') ?? prefs.getString('purb_chetana_meal_voice_dinner');
+ _breakfastVoicePath = prefs.getString('aninai_meal_voice_breakfast_$targetId') ?? prefs.getString('aninai_meal_voice_breakfast');
+ _lunchVoicePath = prefs.getString('aninai_meal_voice_lunch_$targetId') ?? prefs.getString('aninai_meal_voice_lunch');
+ _dinnerVoicePath = prefs.getString('aninai_meal_voice_dinner_$targetId') ?? prefs.getString('aninai_meal_voice_dinner');
  }
 
  // Fetch cloud sync schedules for active Elder ID
@@ -289,8 +294,8 @@ class ScheduleService extends ChangeNotifier {
 
  Future<void> setMealVoicePath(String mealKey, String? path) async {
  final prefs = await SharedPreferences.getInstance();
- final key = 'purb_chetana_meal_voice_${mealKey}_$_currentElderId';
- final globalKey = 'purb_chetana_meal_voice_$mealKey';
+ final key = 'aninai_meal_voice_${mealKey}_$_currentElderId';
+ final globalKey = 'aninai_meal_voice_$mealKey';
  if (path != null && path.isNotEmpty) {
  if (mealKey == 'breakfast') _breakfastVoicePath = path;
  if (mealKey == 'lunch') _lunchVoicePath = path;
@@ -328,7 +333,7 @@ class ScheduleService extends ChangeNotifier {
 
  void _scanAndLoadMealVoicesFromDiskSync() {
  try {
- final dir = Directory('/data/user/0/com.example.purb_chetana/app_flutter');
+ final dir = Directory('/data/user/0/com.example.aninai/app_flutter');
  if (!dir.existsSync()) return;
  final files = dir.listSync().whereType<File>().toList();
  if (_breakfastVoicePath == null || !File(_breakfastVoicePath!).existsSync()) {
@@ -420,14 +425,18 @@ class ScheduleService extends ChangeNotifier {
  await HiveService.saveHydrationStateForElder(targetId, _hydrationTargetLiters, _hydrationCurrentGlasses);
 
  final prefs = await SharedPreferences.getInstance();
- final key ='purb_chetana_schedules_$targetId';
+ final key ='aninai_schedules_$targetId';
  final encoded = jsonEncode(_reminders.map((r) => r.toJson()).toList());
  _lastSavedJson = encoded;
  await prefs.setString(key, encoded);
 
- final hydKey ='purb_chetana_hydration_$targetId';
+ final hydKey ='aninai_hydration_$targetId';
  await prefs.setDouble(hydKey, _hydrationTargetLiters);
  await prefs.setInt('${hydKey}_glasses', _hydrationCurrentGlasses);
+ await prefs.setInt('${hydKey}_voiceMode', _hydrationVoiceMode);
+ if (_hydrationCustomVoicePath != null && _hydrationCustomVoicePath!.isNotEmpty) {
+ await prefs.setString('${hydKey}_customVoicePath', _hydrationCustomVoicePath!);
+ }
 
  if (_webRtcService != null && _webRtcService!.isConnected) {
  _webRtcService!.syncAllRemindersOverP2P();
@@ -551,6 +560,49 @@ class ScheduleService extends ChangeNotifier {
  try {
  if (_currentElderId.isEmpty) return;
 
+ if (isCaretakerMode) {
+ try {
+ final sosData = await _cloudSync.pullSosAlertCloud(_currentElderId);
+ if (sosData != null && sosData['active'] == true) {
+ final String sosTitle = sosData['title'] ?? '🚨 Caregiver Alert: Elder Missed Reminder!';
+ final String sosMessage = sosData['message'] ?? 'Elder has missed 3 reminders.';
+ final String sosRemId = sosData['reminderId'] ?? '';
+ final String sosKey = "${sosRemId}_${sosData['timestamp']}";
+
+ if (_lastTriggeredSosKey != sosKey) {
+ _lastTriggeredSosKey = sosKey;
+
+ NotificationService.showSystemNotification(
+ title: sosTitle,
+ body: sosMessage,
+ spokenText: sosMessage,
+ fallbackEnglishText: sosMessage,
+ reminderId: sosRemId,
+ takenLabel: 'Check Elder',
+ yetToTakeLabel: 'Dismiss',
+ langCode: 'en',
+ showActions: false,
+ speak: false,
+ );
+
+ NotificationService.playEmergencyBeepAlarm();
+
+ _activeNotification = {
+ 'id': 'notif_sos_${DateTime.now().millisecondsSinceEpoch}',
+ 'reminderId': sosRemId,
+ 'title': sosTitle,
+ 'body': sosMessage,
+ 'isCaregiverAlert': true,
+ 'timestamp': DateTime.now(),
+ };
+ notifyListeners();
+ }
+ }
+ } catch (e) {
+ debugPrint('Caregiver SOS pull error: $e');
+ }
+ }
+
  final pullResponse = await _cloudSync.pullScheduleCloudDetailed(_currentElderId);
 
  if (pullResponse.status == CloudSyncStatus.networkError) {
@@ -576,9 +628,73 @@ class ScheduleService extends ChangeNotifier {
  int get hydrationTargetGlasses => (_hydrationTargetLiters * 4).round();
  int get hydrationCurrentGlasses => _hydrationCurrentGlasses;
  double get hydrationCurrentLiters => _hydrationCurrentGlasses * 0.25;
+ int get hydrationVoiceMode => _hydrationVoiceMode;
+ String? get hydrationCustomVoicePath => _hydrationCustomVoicePath;
+
+ void setHydrationVoiceConfig(int mode, String? customPath, {I18nService? i18n}) {
+ if (i18n != null) _i18n = i18n;
+ _hydrationVoiceMode = mode;
+ if (customPath != null && customPath.isNotEmpty) {
+ _hydrationCustomVoicePath = customPath;
+ }
+ saveSchedules();
+ notifyListeners();
+ }
+
  List<ReminderItem> get reminders => _reminders;
  Map<String, dynamic>? get activeNotification => _activeNotification;
  bool get isHydrationTimerActive => _hydrationTimer != null && _hydrationTimer!.isActive;
+
+ void toggleReminderCompletionForDay(String reminderId, int dayIndex) {
+ final index = _reminders.indexWhere((r) => r.id == reminderId);
+ if (index != -1) {
+ _reminders[index].toggleCompletionForDay(dayIndex);
+ saveSchedules();
+ notifyListeners();
+ }
+ }
+
+ Map<String, dynamic> getWeeklyProgressStats() {
+ final medReminders = _reminders.where((r) => r.type == ReminderType.medicine).toList();
+ final routineReminders = _reminders.where((r) => r.type == ReminderType.routine).toList();
+
+ final totalMeds = medReminders.length;
+ final todayDayIdx = DateTime.now().weekday - 1; // 0 = Mon, 6 = Sun
+ final completedMedsToday = medReminders.where((r) => r.isCompletedForDay(todayDayIdx)).length;
+ final int medPercentage = totalMeds == 0 ? 100 : ((completedMedsToday / totalMeds) * 100).round();
+
+ final totalRoutines = routineReminders.length;
+ final completedRoutinesToday = routineReminders.where((r) => r.isCompletedForDay(todayDayIdx)).length;
+ final int routinePercentage = totalRoutines == 0 ? 100 : ((completedRoutinesToday / totalRoutines) * 100).round();
+
+ final totalAll = totalMeds + totalRoutines;
+ final completedAll = completedMedsToday + completedRoutinesToday;
+ final int overallPercentage = totalAll == 0 ? 100 : ((completedAll / totalAll) * 100).round();
+
+ final List<double> medWeeklyBars = List.generate(7, (dayIdx) {
+ if (totalMeds == 0) return 0.0;
+ final completedOnDay = medReminders.where((r) => r.isCompletedForDay(dayIdx)).length;
+ return completedOnDay / totalMeds;
+ });
+
+ final List<double> routineWeeklyBars = List.generate(7, (dayIdx) {
+ if (totalRoutines == 0) return 0.0;
+ final completedOnDay = routineReminders.where((r) => r.isCompletedForDay(dayIdx)).length;
+ return completedOnDay / totalRoutines;
+ });
+
+ return {
+ 'totalMeds': totalMeds,
+ 'completedMeds': completedMedsToday,
+ 'medPercentage': medPercentage,
+ 'totalRoutines': totalRoutines,
+ 'completedRoutines': completedRoutinesToday,
+ 'routinePercentage': routinePercentage,
+ 'overallPercentage': overallPercentage,
+ 'medWeeklyBars': medWeeklyBars,
+ 'routineWeeklyBars': routineWeeklyBars,
+ };
+ }
 
  void updateI18n(I18nService i18n) {
  final langChanged = _i18n?.currentLang != i18n.currentLang;
@@ -702,55 +818,107 @@ class ScheduleService extends ChangeNotifier {
  }
  }
 
- /// Parses 12-hour (e.g."08:00 AM","8:30 PM") and 24-hour ("14:30") strings into a target DateTime
+ /// Parses 12-hour (e.g. "08:00 AM", "8:30 PM") and 24-hour ("14:30") strings into a base DateTime
  DateTime? parseScheduledTimeToDateTime(String timeStr) {
  final now = DateTime.now();
  final timeUpper = timeStr.trim().toUpperCase();
 
- // 1. Try 12-Hour format with AM/PM (e.g.,"08:00 AM","8:30 PM","11:15 AM","12:00 PM")
+ int? hour;
+ int? minute;
+
  final reg12 = RegExp(r'(\d{1,2}):(\d{2})\s*(AM|PM)');
  final match12 = reg12.firstMatch(timeUpper);
  if (match12 != null) {
- int hour = int.parse(match12.group(1) ??'0');
- final minute = int.parse(match12.group(2) ??'0');
- final isPm = match12.group(3) =='PM';
-
+ hour = int.parse(match12.group(1) ?? '0');
+ minute = int.parse(match12.group(2) ?? '0');
+ final isPm = match12.group(3) == 'PM';
  if (hour == 12) {
  hour = isPm ? 12 : 0;
  } else if (isPm) {
  hour += 12;
  }
-
- var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
- // If the target time for today has passed by more than 1 minute, schedule for tomorrow
- if (scheduledDate.isBefore(now.subtract(const Duration(minutes: 1)))) {
- scheduledDate = scheduledDate.add(const Duration(days: 1));
- }
- return scheduledDate;
- }
-
- // 2. Try 24-Hour format (e.g.,"14:30","08:00")
+ } else {
  final reg24 = RegExp(r'(\d{1,2}):(\d{2})');
  final match24 = reg24.firstMatch(timeUpper);
  if (match24 != null) {
- final hour = int.parse(match24.group(1) ??'0');
- final minute = int.parse(match24.group(2) ??'0');
+ hour = int.parse(match24.group(1) ?? '0');
+ minute = int.parse(match24.group(2) ?? '0');
+ }
+ }
 
+ if (hour == null || minute == null) return null;
+
+ return DateTime(now.year, now.month, now.day, hour, minute);
+ }
+
+ /// Calculates the exact next target DateTime based on ReminderItem repeatOption & selectedDays
+ DateTime? calculateNextScheduledDate(ReminderItem item) {
+ final now = DateTime.now();
+ final baseTarget = parseScheduledTimeToDateTime(item.time);
+ if (baseTarget == null) return null;
+
+ final hour = baseTarget.hour;
+ final minute = baseTarget.minute;
+
+ final option = item.repeatOption;
+ final selectedDays = item.selectedDays;
+
+ if (option == 'weekdays') {
+ for (int i = 0; i <= 7; i++) {
+ final candidateDate = now.add(Duration(days: i));
+ final dayOfWeekIndex = candidateDate.weekday - 1; // 0 = Mon, ..., 6 = Sun
+ if (dayOfWeekIndex >= 0 && dayOfWeekIndex <= 4) { // Mon..Fri
+ final target = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
+ if (target.isAfter(now)) {
+ return target;
+ }
+ }
+ }
+ } else if (option == 'alternate') {
+ DateTime start;
+ try {
+ start = DateTime.parse(item.startDate);
+ } catch (_) {
+ start = DateTime(now.year, now.month, now.day);
+ }
+ final cleanStart = DateTime(start.year, start.month, start.day);
+
+ for (int i = 0; i <= 30; i++) {
+ final candidateDate = DateTime(now.year, now.month, now.day).add(Duration(days: i));
+ final diffDays = candidateDate.difference(cleanStart).inDays.abs();
+ if (diffDays % 2 == 0) {
+ final target = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
+ if (target.isAfter(now)) {
+ return target;
+ }
+ }
+ }
+ } else if (option == 'custom' && selectedDays.isNotEmpty) {
+ for (int i = 0; i <= 7; i++) {
+ final candidateDate = now.add(Duration(days: i));
+ final dayOfWeekIndex = candidateDate.weekday - 1; // 0 = Mon, ..., 6 = Sun
+ if (selectedDays.contains(dayOfWeekIndex)) {
+ final target = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
+ if (target.isAfter(now)) {
+ return target;
+ }
+ }
+ }
+ }
+
+ // Default 'daily' or fallback:
  var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
  if (scheduledDate.isBefore(now.subtract(const Duration(minutes: 1)))) {
  scheduledDate = scheduledDate.add(const Duration(days: 1));
  }
  return scheduledDate;
- }
-
- return null;
  }
 
  void _scheduleReminderTimer(ReminderItem item, {I18nService? i18n}) {
  _scheduledTimers[item.id]?.cancel();
  if (isCaretakerMode) return;
 
- final targetDate = parseScheduledTimeToDateTime(item.time);
+ final targetDate = calculateNextScheduledDate(item);
  if (targetDate != null) {
  final delay = targetDate.difference(DateTime.now());
  if (delay.inSeconds > 0) {
@@ -802,9 +970,11 @@ class ScheduleService extends ChangeNotifier {
  NotificationService.showSystemNotification(
  title: title,
  body: body,
- spokenText:'$title. $body',
+ spokenText: '$title. $body',
  fallbackEnglishText: fallbackEn,
- reminderId:'hyd',
+ customVoicePath: _hydrationVoiceMode == 1 ? _hydrationCustomVoicePath : null,
+ voiceMode: _hydrationVoiceMode,
+ reminderId: 'hyd',
  takenLabel: logWaterBtnText,
  yetToTakeLabel: logWaterBtnText,
  langCode: langCode,
@@ -1088,10 +1258,25 @@ class ScheduleService extends ChangeNotifier {
 
  /// Triggers specialized notification with interactive Taken / Yet to Take drag-down action buttons
  void triggerScheduleNotificationItem(ReminderItem item, {I18nService? i18n, bool force = false, int attemptCount = 1}) {
- if (attemptCount < 4) {
- if (isCaretakerMode) return;
+ if (attemptCount >= 4) {
+ if (!isCaretakerMode) {
+ // Elder missed 3 attempts (Attempt 4 triggered). Push SOS alert to Cloud Relay for Caregiver!
+ final activeElderId = _currentElderId.isNotEmpty ? _currentElderId : 'NER-4821';
+ final alertTitle = '🚨 Caregiver Alert: Elder Missed Reminder!';
+ final alertMsg = 'Elder has not taken/started "${item.title}" after 3 reminders. Please check on Elder immediately.';
+
+ _cloudSync.pushSosAlertCloud(
+ activeElderId,
+ title: alertTitle,
+ message: alertMsg,
+ reminderId: item.id,
+ );
+
+ debugPrint('4th SOS Alert pushed to cloud for Caregiver for elderId: $activeElderId');
+ return;
+ }
  } else {
- if (!isCaretakerMode) return;
+ if (isCaretakerMode) return;
  }
  if (item.isCompleted) return;
 
@@ -1215,8 +1400,13 @@ class ScheduleService extends ChangeNotifier {
  ? rawYetToTake
  : (isTamil ?'எடுக்கவில்லை':'Yet to Take');
 
- final takenLabel = isRoutine ? startedLabel : takenText;
- final yetToTakeLabel = isRoutine ? notStartedLabel : yetToTakeText;
+ final isAppt = item.type == ReminderType.appointment;
+ final takenLabel = isAppt
+ ? (isTamil ? 'சென்றேன்' : 'Attended')
+ : (isRoutine ? startedLabel : takenText);
+ final yetToTakeLabel = isAppt
+ ? (isTamil ? 'செல்லவில்லை' : 'Not Attended')
+ : (isRoutine ? notStartedLabel : yetToTakeText);
 
  NotificationService.showSystemNotification(
  title: notifTitle,
@@ -1231,11 +1421,13 @@ class ScheduleService extends ChangeNotifier {
  yetToTakeLabel: yetToTakeLabel,
  langCode: langCode,
  isHydration: item.type == ReminderType.hydration,
- showActions: attemptCount < 4 && (item.type == ReminderType.medicine || item.type == ReminderType.routine),
+ showActions: attemptCount < 4 && (item.type == ReminderType.medicine || item.type == ReminderType.routine || item.type == ReminderType.appointment),
  speak: attemptCount < 4,
  onAction: item.type == ReminderType.hydration ? () => logWaterGlass() : null,
  onTaken: () => markReminderTaken(item.id),
  onYetToTake: () => markReminderYetToTake(item.id),
+ medicineImagePath: item.medicineImagePath,
+ pillsCount: item.pillsCount,
  );
 
  if (attemptCount >= 4) {
@@ -1438,16 +1630,20 @@ class ScheduleService extends ChangeNotifier {
  required String medicineName,
  required String pillsCount,
  required String time,
- String instructions ='Take with water',
- String customVoicePath ='',
+ String instructions = 'Take with water',
+ String customVoicePath = '',
  int voiceMode = 0,
- String clonedVoiceSamplePath ='',
- String createdByRole ='caretaker',
+ String clonedVoiceSamplePath = '',
+ String createdByRole = 'caretaker',
+ String medicineImagePath = '',
+ String repeatOption = 'daily',
+ List<int>? selectedDays,
+ String? startDate,
  I18nService? i18n,
  }) {
  if (i18n != null) _i18n = i18n;
- final newId ='med_${DateTime.now().millisecondsSinceEpoch}';
- final detailText ='$pillsCount pill(s)${instructions.isNotEmpty ?"• $instructions":""}';
+ final newId = 'med_${DateTime.now().millisecondsSinceEpoch}';
+ final detailText = '$pillsCount pill(s)${instructions.isNotEmpty ?"• $instructions":""}';
  final item = ReminderItem(
  id: newId,
  type: ReminderType.medicine,
@@ -1461,11 +1657,155 @@ class ScheduleService extends ChangeNotifier {
  clonedVoiceSamplePath: clonedVoiceSamplePath,
  isCompleted: false,
  createdByRole: createdByRole,
+ medicineImagePath: medicineImagePath,
+ repeatOption: repeatOption,
+ selectedDays: selectedDays ?? [0, 1, 2, 3, 4, 5, 6],
+ startDate: startDate ?? DateTime.now().toIso8601String().split('T')[0],
  );
  _reminders.insert(0, item);
  _scheduleReminderTimer(item, i18n: i18n);
  saveSchedules();
  speakScheduledVoiceSuccess(customVoicePath: customVoicePath, voiceMode: voiceMode, clonedVoiceSamplePath: clonedVoiceSamplePath);
+ }
+
+ /// Updates an existing medicine reminder by ID and recalculates its repeat schedule & alarm
+ void updateMedicineReminder({
+ required String id,
+ required String medicineName,
+ required String pillsCount,
+ required String time,
+ String instructions = 'Take with water',
+ String customVoicePath = '',
+ int voiceMode = 0,
+ String clonedVoiceSamplePath = '',
+ String createdByRole = 'caretaker',
+ String medicineImagePath = '',
+ String repeatOption = 'daily',
+ List<int>? selectedDays,
+ String? startDate,
+ I18nService? i18n,
+ }) {
+ if (i18n != null) _i18n = i18n;
+ final index = _reminders.indexWhere((r) => r.id == id);
+ if (index == -1) return;
+
+ final existingItem = _reminders[index];
+ final detailText = '$pillsCount pill(s)${instructions.isNotEmpty ? " • $instructions" : ""}';
+ final updatedItem = ReminderItem(
+ id: id,
+ type: existingItem.type,
+ title: medicineName,
+ time: time,
+ detail: detailText,
+ pillsCount: pillsCount,
+ instructions: instructions,
+ customVoicePath: customVoicePath,
+ voiceMode: voiceMode,
+ clonedVoiceSamplePath: clonedVoiceSamplePath,
+ isCompleted: existingItem.isCompleted,
+ completedDays: existingItem.completedDays,
+ reminderAttempt: existingItem.reminderAttempt,
+ createdByRole: createdByRole,
+ medicineImagePath: medicineImagePath,
+ repeatOption: repeatOption,
+ selectedDays: selectedDays ?? existingItem.selectedDays,
+ startDate: startDate ?? existingItem.startDate,
+ );
+
+ _scheduledTimers[id]?.cancel();
+ _scheduledTimers.remove(id);
+ NotificationService.cancelAlarm(id.hashCode.abs() % 100000);
+
+ _reminders[index] = updatedItem;
+ _scheduleReminderTimer(updatedItem, i18n: i18n);
+ saveSchedules();
+ }
+
+ /// Updates an existing medical appointment by ID and reschedules its alarm
+ void updateMedicalAppointment({
+ required String id,
+ required String title,
+ required String dateTime,
+ required String location,
+ String medicineImagePath = '',
+ I18nService? i18n,
+ }) {
+ if (i18n != null) _i18n = i18n;
+ final index = _reminders.indexWhere((r) => r.id == id);
+ if (index == -1) return;
+
+ final existingItem = _reminders[index];
+ final updatedItem = ReminderItem(
+ id: id,
+ type: ReminderType.appointment,
+ title: title,
+ time: dateTime,
+ detail: location.isNotEmpty ? location : 'Consultation Visit',
+ customVoicePath: existingItem.customVoicePath,
+ voiceMode: existingItem.voiceMode,
+ clonedVoiceSamplePath: existingItem.clonedVoiceSamplePath,
+ isCompleted: existingItem.isCompleted,
+ completedDays: existingItem.completedDays,
+ reminderAttempt: existingItem.reminderAttempt,
+ createdByRole: existingItem.createdByRole,
+ medicineImagePath: medicineImagePath,
+ repeatOption: existingItem.repeatOption,
+ selectedDays: existingItem.selectedDays,
+ startDate: existingItem.startDate,
+ );
+
+ _scheduledTimers[id]?.cancel();
+ _scheduledTimers.remove(id);
+ NotificationService.cancelAlarm(id.hashCode.abs() % 100000);
+
+ _reminders[index] = updatedItem;
+ _scheduleReminderTimer(updatedItem, i18n: i18n);
+ saveSchedules();
+ }
+
+ /// Updates an existing daily activity routine by ID and reschedules its alarm
+ void updateDailyActivity({
+ required String id,
+ required String activityTitle,
+ required String time,
+ required String details,
+ String customVoicePath = '',
+ int voiceMode = 0,
+ String clonedVoiceSamplePath = '',
+ String medicineImagePath = '',
+ I18nService? i18n,
+ }) {
+ if (i18n != null) _i18n = i18n;
+ final index = _reminders.indexWhere((r) => r.id == id);
+ if (index == -1) return;
+
+ final existingItem = _reminders[index];
+ final updatedItem = ReminderItem(
+ id: id,
+ type: ReminderType.routine,
+ title: activityTitle,
+ time: time,
+ detail: details.isNotEmpty ? details : 'Daily Routine Activity',
+ customVoicePath: customVoicePath,
+ voiceMode: voiceMode,
+ clonedVoiceSamplePath: clonedVoiceSamplePath,
+ isCompleted: existingItem.isCompleted,
+ completedDays: existingItem.completedDays,
+ reminderAttempt: existingItem.reminderAttempt,
+ createdByRole: existingItem.createdByRole,
+ medicineImagePath: medicineImagePath,
+ repeatOption: existingItem.repeatOption,
+ selectedDays: existingItem.selectedDays,
+ startDate: existingItem.startDate,
+ );
+
+ _scheduledTimers[id]?.cancel();
+ _scheduledTimers.remove(id);
+ NotificationService.cancelAlarm(id.hashCode.abs() % 100000);
+
+ _reminders[index] = updatedItem;
+ _scheduleReminderTimer(updatedItem, i18n: i18n);
+ saveSchedules();
  }
 
  void addMedicineRoutine({
@@ -1498,6 +1838,7 @@ class ScheduleService extends ChangeNotifier {
  int voiceMode = 0,
  String clonedVoiceSamplePath ='',
  String createdByRole ='caretaker',
+ String medicineImagePath ='',
  I18nService? i18n,
  }) {
  if (i18n != null) _i18n = i18n;
@@ -1513,6 +1854,7 @@ class ScheduleService extends ChangeNotifier {
  clonedVoiceSamplePath:'',
  isCompleted: false,
  createdByRole: createdByRole,
+ medicineImagePath: medicineImagePath,
  );
  _reminders.insert(0, item);
  _scheduleReminderTimer(item, i18n: i18n);
@@ -1528,6 +1870,7 @@ class ScheduleService extends ChangeNotifier {
  int voiceMode = 0,
  String clonedVoiceSamplePath ='',
  String createdByRole ='caretaker',
+ String medicineImagePath ='',
  I18nService? i18n,
  }) {
  if (i18n != null) _i18n = i18n;
@@ -1543,6 +1886,7 @@ class ScheduleService extends ChangeNotifier {
  clonedVoiceSamplePath: clonedVoiceSamplePath,
  isCompleted: false,
  createdByRole: createdByRole,
+ medicineImagePath: medicineImagePath,
  );
  _reminders.insert(0, item);
  _scheduleReminderTimer(item, i18n: i18n);
@@ -1683,10 +2027,14 @@ class ScheduleService extends ChangeNotifier {
  ? rawYetToTake
  : (isTamil ?'எடுக்கவில்லை':'Yet to Take');
 
- final itemTakenLabel = isRoutine ? startedLabel : takenText;
- final itemYetToTakeLabel = isRoutine ? notStartedLabel : yetToTakeText;
-
  final isAppt = item.type == ReminderType.appointment;
+ final itemTakenLabel = isAppt
+ ? (isTamil ? 'சென்றேன்' : 'Attended')
+ : (isRoutine ? startedLabel : takenText);
+ final itemYetToTakeLabel = isAppt
+ ? (isTamil ? 'செல்லவில்லை' : 'Not Attended')
+ : (isRoutine ? notStartedLabel : yetToTakeText);
+
  final effectiveCustomVoicePath = isAppt ?'': item.customVoicePath;
  final effectiveVoiceMode = isAppt ? 0 : item.voiceMode;
  final effectiveClonedVoiceSamplePath = isAppt ?'': item.clonedVoiceSamplePath;
@@ -1706,7 +2054,9 @@ class ScheduleService extends ChangeNotifier {
  clonedVoiceSamplePath: effectiveClonedVoiceSamplePath,
  langCode: langCode,
  isHydration: item.type == ReminderType.hydration,
- showActions: item.type == ReminderType.medicine || item.type == ReminderType.routine,
+ showActions: item.type == ReminderType.medicine || item.type == ReminderType.routine || item.type == ReminderType.appointment,
+ medicineImagePath: item.medicineImagePath,
+ pillsCount: item.pillsCount,
  );
  }
  }

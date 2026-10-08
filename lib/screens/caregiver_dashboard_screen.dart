@@ -1,3 +1,4 @@
+import 'schedule_reminders_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -610,7 +611,10 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
  child: Text(i18n.translate('noRemindersActive'), style: TextStyle(fontSize: 12, color: Colors.grey)),
  ),
  ] else ...[
- ...schedule.reminders.map((r) => Container(
+ ...schedule.reminders.map((r) => InkWell(
+ onTap: () => showEditReminderDialog(context, r, i18n, schedule),
+ borderRadius: BorderRadius.circular(12),
+ child: Container(
  margin: const EdgeInsets.only(bottom: 8),
  padding: const EdgeInsets.all(12),
  decoration: BoxDecoration(
@@ -643,13 +647,27 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
  ],
  ),
  ),
- const SizedBox(width: 6),
+ const SizedBox(width: 4),
+ IconButton(
+ padding: EdgeInsets.zero,
+ constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+ icon: const Icon(Icons.edit, color: Color(0xFF0284C7), size: 20),
+ onPressed: () => showEditReminderDialog(context, r, i18n, schedule),
+ ),
+ IconButton(
+ padding: EdgeInsets.zero,
+ constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+ icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+ onPressed: () => confirmAndDeleteReminderDialog(context, r, i18n, schedule),
+ ),
+ const SizedBox(width: 4),
  Icon(
  r.isCompleted ? Icons.check_circle : Icons.circle_outlined,
  color: r.isCompleted ? const Color(0xFF23B39B) : Colors.grey,
  size: 24,
  ),
  ],
+ ),
  ),
  )).toList(),
  ],

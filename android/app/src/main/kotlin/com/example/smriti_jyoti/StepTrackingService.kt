@@ -17,11 +17,11 @@ class StepTrackingService : Service() {
     companion object {
         private const val TAG = "StepTrackingService"
         const val NOTIFICATION_ID = 98989
-        const val CHANNEL_ID = "purb_chetana_step_tracking"
+        const val CHANNEL_ID = "aninai_step_tracking"
         const val CHANNEL_NAME = "Elder Activity & Step Tracking"
 
-        const val ACTION_START = "com.purb_chetana.ACTION_START_STEP_TRACKING"
-        const val ACTION_STOP = "com.purb_chetana.ACTION_STOP_STEP_TRACKING"
+        const val ACTION_START = "com.aninai.ACTION_START_STEP_TRACKING"
+        const val ACTION_STOP = "com.aninai.ACTION_STOP_STEP_TRACKING"
 
         @Volatile
         var isServiceRunning: Boolean = false

@@ -15,8 +15,13 @@ class ReminderItem {
   final int voiceMode; // 0: Standard AI TTS, 1: Custom Voice Note, 2: Cloned Family AI Voice
   final String clonedVoiceSamplePath;
   bool isCompleted;
+  List<int> completedDays; // 0 = Mon, 1 = Tue, ..., 6 = Sun
   int reminderAttempt; // 1 = 1st reminder, 2 = 2nd reminder, 3 = 3rd reminder
   final String createdByRole; // 'elder' or 'caretaker'
+  final String medicineImagePath;
+  final String repeatOption; // 'daily', 'weekdays', 'alternate', 'custom'
+  final List<int> selectedDays; // 0 = Mon, 1 = Tue, ..., 6 = Sun
+  final String startDate; // YYYY-MM-DD for tracking alternate day intervals
 
   ReminderItem({
     required this.id,
@@ -30,9 +35,29 @@ class ReminderItem {
     this.voiceMode = 0,
     this.clonedVoiceSamplePath = '',
     this.isCompleted = false,
+    List<int>? completedDays,
     this.reminderAttempt = 1,
     this.createdByRole = 'caretaker',
-  });
+    this.medicineImagePath = '',
+    this.repeatOption = 'daily',
+    List<int>? selectedDays,
+    String? startDate,
+  })  : completedDays = completedDays ?? (isCompleted ? [DateTime.now().weekday - 1] : []),
+        selectedDays = selectedDays ?? [0, 1, 2, 3, 4, 5, 6],
+        startDate = startDate ?? DateTime.now().toIso8601String().split('T')[0];
+
+  bool isCompletedForDay(int dayIndex) {
+    return completedDays.contains(dayIndex);
+  }
+
+  void toggleCompletionForDay(int dayIndex) {
+    if (completedDays.contains(dayIndex)) {
+      completedDays.remove(dayIndex);
+    } else {
+      completedDays.add(dayIndex);
+    }
+    isCompleted = completedDays.contains(DateTime.now().weekday - 1);
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -46,8 +71,13 @@ class ReminderItem {
         'voiceMode': voiceMode,
         'clonedVoiceSamplePath': clonedVoiceSamplePath,
         'isCompleted': isCompleted,
+        'completedDays': completedDays,
         'reminderAttempt': reminderAttempt,
         'createdByRole': createdByRole,
+        'medicineImagePath': medicineImagePath,
+        'repeatOption': repeatOption,
+        'selectedDays': selectedDays,
+        'startDate': startDate,
       };
 
   factory ReminderItem.fromJson(Map<String, dynamic> json) {
@@ -110,6 +140,23 @@ class ReminderItem {
     }
     final effectiveVm = hasValidCustomVoice ? 1 : (rawVm == 1 && customPath.isNotEmpty ? 1 : rawVm);
 
+    final isComp = json['isCompleted'] ?? false;
+    final rawCompletedDays = json['completedDays'];
+    List<int> parsedCompletedDays = [];
+    if (rawCompletedDays is List) {
+      parsedCompletedDays = rawCompletedDays.map((e) => (e as num).toInt()).toList();
+    } else if (isComp == true) {
+      parsedCompletedDays = [DateTime.now().weekday - 1];
+    }
+
+    final rawRepeatOption = (json['repeatOption'] ?? 'daily').toString();
+    final rawSelectedDays = json['selectedDays'];
+    List<int> parsedSelectedDays = [0, 1, 2, 3, 4, 5, 6];
+    if (rawSelectedDays is List) {
+      parsedSelectedDays = rawSelectedDays.map((e) => (e as num).toInt()).toList();
+    }
+    final rawStartDate = (json['startDate'] ?? DateTime.now().toIso8601String().split('T')[0]).toString();
+
     return ReminderItem(
       id: idStr,
       type: finalType,
@@ -121,9 +168,14 @@ class ReminderItem {
       customVoicePath: customPath,
       voiceMode: effectiveVm,
       clonedVoiceSamplePath: json['clonedVoiceSamplePath'] ?? '',
-      isCompleted: json['isCompleted'] ?? false,
+      isCompleted: isComp,
+      completedDays: parsedCompletedDays,
       reminderAttempt: json['reminderAttempt'] is int ? json['reminderAttempt'] as int : 1,
       createdByRole: json['createdByRole'] ?? 'caretaker',
+      medicineImagePath: json['medicineImagePath'] ?? '',
+      repeatOption: rawRepeatOption,
+      selectedDays: parsedSelectedDays,
+      startDate: rawStartDate,
     );
   }
 
