@@ -654,21 +654,21 @@ class ScheduleService extends ChangeNotifier {
  }
  }
 
- Map<String, dynamic> getWeeklyProgressStats() {
+ Map<String, dynamic> getWeeklyProgressStats({int? forDayIndex}) {
  final medReminders = _reminders.where((r) => r.type == ReminderType.medicine).toList();
  final routineReminders = _reminders.where((r) => r.type == ReminderType.routine).toList();
 
  final totalMeds = medReminders.length;
- final todayDayIdx = DateTime.now().weekday - 1; // 0 = Mon, 6 = Sun
- final completedMedsToday = medReminders.where((r) => r.isCompletedForDay(todayDayIdx)).length;
- final int medPercentage = totalMeds == 0 ? 100 : ((completedMedsToday / totalMeds) * 100).round();
+ final targetDayIdx = forDayIndex ?? (DateTime.now().weekday - 1); // 0 = Mon, 6 = Sun
+ final completedMedsDay = medReminders.where((r) => r.isCompletedForDay(targetDayIdx)).length;
+ final int medPercentage = totalMeds == 0 ? 100 : ((completedMedsDay / totalMeds) * 100).round();
 
  final totalRoutines = routineReminders.length;
- final completedRoutinesToday = routineReminders.where((r) => r.isCompletedForDay(todayDayIdx)).length;
- final int routinePercentage = totalRoutines == 0 ? 100 : ((completedRoutinesToday / totalRoutines) * 100).round();
+ final completedRoutinesDay = routineReminders.where((r) => r.isCompletedForDay(targetDayIdx)).length;
+ final int routinePercentage = totalRoutines == 0 ? 100 : ((completedRoutinesDay / totalRoutines) * 100).round();
 
  final totalAll = totalMeds + totalRoutines;
- final completedAll = completedMedsToday + completedRoutinesToday;
+ final completedAll = completedMedsDay + completedRoutinesDay;
  final int overallPercentage = totalAll == 0 ? 100 : ((completedAll / totalAll) * 100).round();
 
  final List<double> medWeeklyBars = List.generate(7, (dayIdx) {
@@ -684,11 +684,12 @@ class ScheduleService extends ChangeNotifier {
  });
 
  return {
+ 'targetDayIndex': targetDayIdx,
  'totalMeds': totalMeds,
- 'completedMeds': completedMedsToday,
+ 'completedMeds': completedMedsDay,
  'medPercentage': medPercentage,
  'totalRoutines': totalRoutines,
- 'completedRoutines': completedRoutinesToday,
+ 'completedRoutines': completedRoutinesDay,
  'routinePercentage': routinePercentage,
  'overallPercentage': overallPercentage,
  'medWeeklyBars': medWeeklyBars,

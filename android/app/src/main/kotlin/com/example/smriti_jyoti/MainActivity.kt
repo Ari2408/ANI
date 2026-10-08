@@ -17,7 +17,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.aninai/notifications"
     private val STEP_CHANNEL = "com.aninai/step_tracker"
-    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v4"
+    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v5"
     private val NOTIFICATION_CHANNEL_NAME = "Aninai Reminders"
     private var pendingActivityPermissionResult: MethodChannel.Result? = null
 
@@ -118,13 +118,40 @@ class MainActivity : FlutterActivity() {
                     val medicineImagePath = call.argument<String>("medicineImagePath") ?: ""
                     val pillsCount = call.argument<String>("pillsCount") ?: ""
                     val langCode = call.argument<String>("langCode") ?: "en"
+                    val customVoicePath = call.argument<String>("customVoicePath") ?: ""
+                    val voiceMode = call.argument<Int>("voiceMode") ?: 0
 
-                    showSystemNotification(id, reminderId, title, body, takenLabel, yetToTakeLabel, isHydration, showActions, medicineImagePath, pillsCount, langCode)
+                    showSystemNotification(id, reminderId, title, body, takenLabel, yetToTakeLabel, isHydration, showActions, medicineImagePath, pillsCount, langCode, customVoicePath, voiceMode)
                     result.success(true)
                 }
                 "requestPermission" -> {
                     if (Build.VERSION.SDK_INT >= 33) {
                         requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 101)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        try {
+                            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                            if (!notificationManager.canUseFullScreenIntent()) {
+                                val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                    data = android.net.Uri.parse("package:$packageName")
+                                }
+                                startActivity(intent)
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("AninaiPerm", "Error opening full screen intent settings", e)
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            if (!android.provider.Settings.canDrawOverlays(this)) {
+                                val intent = Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                                    data = android.net.Uri.parse("package:$packageName")
+                                }
+                                startActivity(intent)
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("AninaiPerm", "Error opening overlay settings", e)
+                        }
                     }
                     result.success(true)
                 }
@@ -418,7 +445,9 @@ class MainActivity : FlutterActivity() {
         showActions: Boolean = true,
         medicineImagePath: String = "",
         pillsCount: String = "",
-        langCode: String = "en"
+        langCode: String = "en",
+        customVoicePath: String = "",
+        voiceMode: Int = 0
     ) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -436,6 +465,7 @@ class MainActivity : FlutterActivity() {
 
         val fullScreenIntent = Intent(this, FullScreenAlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            addCategory(NotificationCompat.CATEGORY_ALARM)
             putExtra("notificationId", id)
             putExtra("reminderId", reminderId)
             putExtra("title", title)
@@ -446,6 +476,8 @@ class MainActivity : FlutterActivity() {
             putExtra("langCode", langCode)
             putExtra("medicineImagePath", medicineImagePath)
             putExtra("pillsCount", pillsCount)
+            putExtra("customVoicePath", customVoicePath)
+            putExtra("voiceMode", voiceMode)
         }
         val fullScreenPendingIntent = PendingIntent.getActivity(this, id * 10 + 9, fullScreenIntent, activityFlags)
 

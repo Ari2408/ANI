@@ -3055,7 +3055,8 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  );
  }
 
- Widget _buildFilterButtons(I18nService i18n, ScheduleService schedule) {
+ Widget _buildFilterButtons(I18nService i18n, ScheduleService schedule, {int? selectedDayIndex}) {
+  final dayIdx = selectedDayIndex ?? _selectedProgressDayIndex;
  final totalCount = schedule.reminders.length;
  final medCount = schedule.reminders.where((r) => r.type == ReminderType.medicine).length;
  final aptCount = schedule.reminders.where((r) => r.type == ReminderType.appointment).length;
@@ -3124,750 +3125,353 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  );
  }
 
- Widget _buildRemindersList(I18nService i18n, ScheduleService schedule, {ReminderType? filterType}) {
- final auth = Provider.of<AuthService>(context);
- List<ReminderItem> baseList = filterType == null
- ? schedule.reminders
- : schedule.reminders.where((r) => r.type == filterType).toList();
+  @override
+  Widget build(BuildContext context) {
+    final i18n = Provider.of<I18nService>(context);
+    final auth = Provider.of<AuthService>(context);
+    final schedule = Provider.of<ScheduleService>(context);
 
- if (_remindersFilterIndex == 1) {
-    baseList = baseList.where((r) => r.type == ReminderType.medicine).toList();
- } else if (_remindersFilterIndex == 2) {
- baseList = baseList.where((r) => r.type == ReminderType.appointment).toList();
- } else if (_remindersFilterIndex == 3) {
- baseList = baseList.where((r) => r.type == ReminderType.routine).toList();
- } else if (_remindersFilterIndex == 4) {
- baseList = baseList.where((r) => !r.isCompleted).toList();
- } else if (_remindersFilterIndex == 5) {
- baseList = baseList.where((r) => r.isCompleted).toList();
- }
+    final user = auth.currentUser;
+    final activeElderId = (user?.mappedElderId != null && user!.mappedElderId.trim().isNotEmpty)
+        ? user.mappedElderId.trim().toUpperCase()
+        : (user?.id.isNotEmpty == true ? user!.id.toUpperCase() : 'NER-9431');
+    schedule.setCurrentElderId(activeElderId);
 
- if (_selectedFilterDate != null) {
- final filterDate = _selectedFilterDate!;
- final targetDateStr = "${filterDate.day} ${_getMonthName(filterDate.month)} ${filterDate.year}";
- final isTodaySelected = filterDate.year == DateTime.now().year &&
- filterDate.month == DateTime.now().month &&
- filterDate.day == DateTime.now().day;
+    final targetGlasses = schedule.hydrationTargetGlasses;
+    final currentGlasses = schedule.hydrationCurrentGlasses;
+    final targetLiters = schedule.hydrationTargetLiters;
 
- baseList = baseList.where((r) {
- final t = r.time;
- if (t.contains(targetDateStr)) return true;
- final hasEmbeddedDate = t.contains('Jan') || t.contains('Feb') || t.contains('Mar') ||
- t.contains('Apr') || t.contains('May') || t.contains('Jun') ||
- t.contains('Jul') || t.contains('Aug') || t.contains('Sep') ||
- t.contains('Oct') || t.contains('Nov') || t.contains('Dec') ||
- t.contains('-');
- if (!hasEmbeddedDate && isTodaySelected) return true;
- return false;
- }).toList();
- }
+    return RefreshIndicator(
+      onRefresh: () async {
+        await schedule.loadSchedules(elderId: activeElderId);
+        setState(() {});
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (_selectedSection == null) ...[
+            _buildCategoryGrid(i18n, schedule, targetLiters),
+            const SizedBox(height: 16),
+            _buildUnifiedWeeklyShowcaseCard(i18n, schedule),
+          ] else ...[
+            _buildIndividualSectionHeader(i18n),
+            if (_selectedSection == 0) ...[
+              _buildHydrationSection(i18n, schedule, targetLiters, currentGlasses, targetGlasses),
+            ] else if (_selectedSection == 1) ...[
+              _buildMedicineSection(i18n, schedule),
+              const SizedBox(height: 16),
+              _buildUnifiedWeeklyShowcaseCard(i18n, schedule, filterType: ReminderType.medicine),
+            ] else if (_selectedSection == 2) ...[
+              _buildAppointmentSection(i18n, schedule),
+              const SizedBox(height: 16),
+              _buildUnifiedWeeklyShowcaseCard(i18n, schedule, filterType: ReminderType.appointment),
+            ] else if (_selectedSection == 3) ...[
+              _buildActivitySection(i18n, schedule),
+              const SizedBox(height: 16),
+              _buildUnifiedWeeklyShowcaseCard(i18n, schedule, filterType: ReminderType.routine),
+            ] else if (_selectedSection == 4) ...[
+              _buildMealVoiceNotesSection(i18n, schedule),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
 
- final filtered = baseList;
+ Widget _buildUnifiedWeeklyShowcaseCard(I18nService i18n, ScheduleService schedule, {ReminderType? filterType}) {
+    final stats = schedule.getWeeklyProgressStats(forDayIndex: _selectedProgressDayIndex);
+    final medPct = stats['medPercentage'] as int;
+    final routinePct = stats['routinePercentage'] as int;
+    final overallPct = stats['overallPercentage'] as int;
+    final medBars = stats['medWeeklyBars'] as List<double>;
+    final routineBars = stats['routineWeeklyBars'] as List<double>;
+    final daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
- return ElderCard(
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Row(
- mainAxisAlignment: MainAxisAlignment.spaceBetween,
- children: [
-          Expanded(
-            child: Text(
-              filterType == ReminderType.medicine
-                  ? '💊 ${i18n.translate("activeMedsHeader")}'
-                  : (filterType == ReminderType.appointment
-                      ? '🩺 ${i18n.translate("upcomingApptsHeader")}'
-                      : (filterType == ReminderType.routine
-                          ? '🏃‍♂️ ${i18n.translate("activeRoutinesHeader")}'
-                          : '💊 ${i18n.translate("todayReminders")}')),
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF61C5B0)),
-              softWrap: true,
+    List<ReminderItem> baseList = filterType == null
+        ? schedule.reminders
+        : schedule.reminders.where((r) => r.type == filterType).toList();
+
+    if (_remindersFilterIndex == 1) {
+      baseList = baseList.where((r) => r.type == ReminderType.medicine).toList();
+    } else if (_remindersFilterIndex == 2) {
+      baseList = baseList.where((r) => r.type == ReminderType.appointment).toList();
+    } else if (_remindersFilterIndex == 3) {
+      baseList = baseList.where((r) => r.type == ReminderType.routine).toList();
+    } else if (_remindersFilterIndex == 4) {
+      baseList = baseList.where((r) => !r.isCompletedForDay(_selectedProgressDayIndex)).toList();
+    } else if (_remindersFilterIndex == 5) {
+      baseList = baseList.where((r) => r.isCompletedForDay(_selectedProgressDayIndex)).toList();
+    }
+
+    final filtered = baseList;
+
+    return ElderCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Showcase Title with overall % Adherence Badge
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      filterType == ReminderType.medicine
+                          ? '💊 Medication Schedules & Weekly Showcase'
+                          : (filterType == ReminderType.appointment
+                              ? '🩺 Doctor Appointments & Weekly Showcase'
+                              : (filterType == ReminderType.routine
+                                  ? '🏃‍♂️ Daily Routines & Weekly Showcase'
+                                  : '📅 Active Schedules & Weekly Showcase')),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                    ),
+                    Text(
+                      i18n.translate('weeklyProgressSubtitle'),
+                      style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF23B39B), Color(0xFF0284C7)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$overallPct%',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Medicine Adherence Progress Bar Inside Showcase Card
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF86EFAC)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '💊 ${i18n.translate("medicineAdherence")}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+                    ),
+                    Text(
+                      '${stats['completedMeds']}/${stats['totalMeds']} Completed • $medPct%',
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: medPct / 100.0,
+                    minHeight: 7,
+                    backgroundColor: const Color(0xFFDCFCE7),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+                  ),
+                ),
+              ],
             ),
           ),
- SizedBox(width: 8),
- Chip(
- label: Text('${filtered.length} ${i18n.translate("activeItems")}', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
- backgroundColor: const Color(0xFF61C5B0),
- ),
- ],
- ),
- const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
- // Touch-friendly Filter Buttons
- _buildFilterButtons(i18n, schedule),
+          // Mon - Sun Interactive Day Selector Bar
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(7, (idx) {
+                final isSelected = _selectedProgressDayIndex == idx;
+                final isMedDone = medBars[idx] >= 1.0;
+                final isRoutineDone = routineBars[idx] >= 1.0;
+                final isDayFullyDone = isMedDone && isRoutineDone;
 
- if (filtered.isEmpty) ...[
- Padding(
- padding: EdgeInsets.all(16),
- child: Text(i18n.translate('noRemindersActive'), style: TextStyle(color: Colors.grey, fontSize: 13)),
- ),
- ] else ...[
- ...filtered.map((r) => Container(
- margin: const EdgeInsets.only(bottom: 10),
- padding: const EdgeInsets.all(12),
- decoration: BoxDecoration(
- color: r.type == ReminderType.appointment
- ? const Color(0xFFFFFBEB)
- : (r.type == ReminderType.routine ? const Color(0xFFE6F4F1) : const Color(0xFFF9FAF8)),
- borderRadius: BorderRadius.circular(14),
- border: Border.all(
- color: r.type == ReminderType.appointment
- ? const Color(0xFFF59E0B)
- : (r.type == ReminderType.routine ? const Color(0xFF61C5B0) : const Color(0xFFCDE4E2)),
- ),
- ),
- child: Row(
- mainAxisAlignment: MainAxisAlignment.spaceBetween,
- children: [
- Expanded(
- child: Row(
- children: [
- Text(
- r.type == ReminderType.medicine ? '💊' : (r.type == ReminderType.appointment ? '🩺' : '🏃‍♂️'),
- style: const TextStyle(fontSize: 28),
- ),
- const SizedBox(width: 12),
- Expanded(
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Text(
- r.title,
- style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
- softWrap: true,
- overflow: TextOverflow.visible,
- ),
- const SizedBox(height: 2),
- Text(
- '${_formatReminderDateTimeDisplay(r.time)} • ${r.detail}${r.type == ReminderType.medicine ? " • ${_formatRepeatScheduleDisplay(r, i18n)}" : ""}',
- style: const TextStyle(fontSize: 12, color: Colors.black87),
- softWrap: true,
- overflow: TextOverflow.visible,
- ),
- ],
- ),
- ),
- ],
- ),
- ),
- Row(
- mainAxisSize: MainAxisSize.min,
- children: [
- IconButton(
- padding: EdgeInsets.zero,
- constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
- icon: Icon(
- r.isCompleted ? Icons.check_circle : Icons.circle_outlined,
- color: r.isCompleted ? const Color(0xFF23B39B) : Colors.grey,
- size: 24,
- ),
- onPressed: () => schedule.toggleReminderCompletion(r.id),
- ),
- IconButton(
- padding: EdgeInsets.zero,
- constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
- icon: const Icon(Icons.edit, color: Color(0xFF0284C7), size: 22),
- onPressed: () {
- if (r.type == ReminderType.medicine) {
- _showEditMedicineDialog(context, r, i18n, schedule);
- } else if (r.type == ReminderType.appointment) {
- _showEditAppointmentDialog(context, r, i18n, schedule);
- } else if (r.type == ReminderType.routine) {
- _showEditRoutineDialog(context, r, i18n, schedule);
- }
- },
- ),
- IconButton(
- padding: EdgeInsets.zero,
- constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
- icon: const Icon(Icons.delete_outline, color: Colors.red, size: 22),
- onPressed: () => _confirmAndDeleteReminder(context, r, i18n, schedule),
- ),
- ],
- ),
- ],
- ),
- )).toList(),
- ],
- ],
- ),
- );
- }
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedProgressDayIndex = idx;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF23B39B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFCBD5E1),
+                          width: isSelected ? 2.0 : 1.2,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFF23B39B).withOpacity(0.35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            daysOfWeek[idx],
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.white : const Color(0xFF334155),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Icon(
+                            isDayFullyDone ? Icons.check_circle : Icons.schedule,
+                            size: 14,
+                            color: isSelected ? Colors.white : (isDayFullyDone ? const Color(0xFF16A34A) : Colors.amber.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 14),
 
- @override
- Widget build(BuildContext context) {
- final i18n = Provider.of<I18nService>(context);
- final auth = Provider.of<AuthService>(context);
- final schedule = Provider.of<ScheduleService>(context);
+          // Filter Buttons for Active Items
+          _buildFilterButtons(i18n, schedule),
+          const SizedBox(height: 8),
 
- final user = auth.currentUser;
- final activeElderId = (user?.mappedElderId != null && user!.mappedElderId.trim().isNotEmpty)
- ? user.mappedElderId.trim().toUpperCase()
- : (user?.id.isNotEmpty == true ? user!.id.toUpperCase() : 'NER-9431');
- schedule.setCurrentElderId(activeElderId);
+          // Reminders Showcase List with Integrated Edit & Delete buttons!
+          if (filtered.isEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(i18n.translate('noRemindersActive'), style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            ),
+          ] else ...[
+            ...filtered.map((r) => InkWell(
+              onTap: () => showEditReminderDialog(context, r, i18n, schedule),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: r.type == ReminderType.appointment
+                      ? const Color(0xFFFFFBEB)
+                      : (r.type == ReminderType.routine ? const Color(0xFFE6F4F1) : const Color(0xFFF9FAF8)),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: r.type == ReminderType.appointment
+                        ? const Color(0xFFF59E0B)
+                        : (r.type == ReminderType.routine ? const Color(0xFF61C5B0) : const Color(0xFFCDE4E2)),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Text(
+                            r.type == ReminderType.medicine ? '💊' : (r.type == ReminderType.appointment ? '🩺' : '🏃‍♂️'),
+                            style: const TextStyle(fontSize: 28),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  r.title,
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                  softWrap: true,
+                                  overflow: TextOverflow.visible,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${_formatReminderDateTimeDisplay(r.time)} • ${r.detail}${r.type == ReminderType.medicine ? " • ${_formatRepeatScheduleDisplay(r, i18n)}" : ""}',
+                                  style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                  softWrap: true,
+                                  overflow: TextOverflow.visible,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          icon: Icon(
+                            r.isCompletedForDay(_selectedProgressDayIndex) ? Icons.check_circle : Icons.circle_outlined,
+                            color: r.isCompletedForDay(_selectedProgressDayIndex) ? const Color(0xFF23B39B) : Colors.grey,
+                            size: 24,
+                          ),
+                          onPressed: () => schedule.toggleReminderCompletionForDay(r.id, _selectedProgressDayIndex),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          icon: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE0F2FE),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.edit, color: Color(0xFF0284C7), size: 18),
+                          ),
+                          tooltip: i18n.currentLang == 'ta' ? 'திருத்து' : 'Edit',
+                          onPressed: () => showEditReminderDialog(context, r, i18n, schedule),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          icon: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFEE2E2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                          ),
+                          tooltip: i18n.currentLang == 'ta' ? 'நீக்கு' : 'Delete',
+                          onPressed: () => confirmAndDeleteReminderDialog(context, r, i18n, schedule),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            )).toList(),
+          ],
+        ],
+      ),
+    );
+  }
 
- final targetGlasses = schedule.hydrationTargetGlasses;
- final currentGlasses = schedule.hydrationCurrentGlasses;
- final targetLiters = schedule.hydrationTargetLiters;
-
- return RefreshIndicator(
- onRefresh: () async {
- await schedule.loadSchedules(elderId: activeElderId);
- setState(() {});
- },
- child: ListView(
- padding: const EdgeInsets.all(16),
- children: [
- if (_selectedSection == null) ...[
- _buildCategoryGrid(i18n, schedule, targetLiters),
- const SizedBox(height: 16),
- _buildRemindersList(i18n, schedule),
- const SizedBox(height: 20),
- _buildWeeklyProgressCard(i18n, schedule),
- ] else ...[
- _buildIndividualSectionHeader(i18n),
- if (_selectedSection == 0) ...[
- _buildHydrationSection(i18n, schedule, targetLiters, currentGlasses, targetGlasses),
- ] else if (_selectedSection == 1) ...[
- _buildMedicineSection(i18n, schedule),
- const SizedBox(height: 16),
- _buildRemindersList(i18n, schedule, filterType: ReminderType.medicine),
- const SizedBox(height: 20),
- _buildWeeklyProgressCard(i18n, schedule),
- ] else if (_selectedSection == 2) ...[
- _buildAppointmentSection(i18n, schedule),
- const SizedBox(height: 16),
- _buildRemindersList(i18n, schedule, filterType: ReminderType.appointment),
- ] else if (_selectedSection == 3) ...[
- _buildActivitySection(i18n, schedule),
- const SizedBox(height: 16),
- _buildRemindersList(i18n, schedule, filterType: ReminderType.routine),
- const SizedBox(height: 20),
- _buildWeeklyProgressCard(i18n, schedule),
- ] else if (_selectedSection == 4) ...[
- _buildMealVoiceNotesSection(i18n, schedule),
- ],
- ],
- ],
- ),
- );
- }
-
- Widget _buildWeeklyProgressCard(I18nService i18n, ScheduleService schedule) {
- final stats = schedule.getWeeklyProgressStats();
- final medPct = stats['medPercentage'] as int;
- final routinePct = stats['routinePercentage'] as int;
- final overallPct = stats['overallPercentage'] as int;
- final medBars = stats['medWeeklyBars'] as List<double>;
- final routineBars = stats['routineWeeklyBars'] as List<double>;
- final daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
- final fullDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
- final selectedDayName = fullDays[_selectedProgressDayIndex];
- final selectedDayShort = daysOfWeek[_selectedProgressDayIndex];
-
- final medList = schedule.reminders.where((r) => r.type == ReminderType.medicine).toList();
- final routineList = schedule.reminders.where((r) => r.type == ReminderType.routine).toList();
-
- return ElderCard(
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Row(
- children: [
- Expanded(
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Text(
- i18n.translate('weeklyProgressTitle'),
- style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
- ),
- Text(
- i18n.translate('weeklyProgressSubtitle'),
- style: const TextStyle(fontSize: 11.5, color: Colors.black54),
- ),
- ],
- ),
- ),
- Container(
- padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
- decoration: BoxDecoration(
- gradient: const LinearGradient(
- colors: [Color(0xFF23B39B), Color(0xFF0284C7)],
- ),
- borderRadius: BorderRadius.circular(12),
- ),
- child: Text(
- '$overallPct%',
- style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
- ),
- ),
- ],
- ),
- const SizedBox(height: 16),
-
- // Horizontal Day-Wise Button Selector Bar
- SingleChildScrollView(
- scrollDirection: Axis.horizontal,
- child: Row(
- children: List.generate(7, (idx) {
- final isSelected = _selectedProgressDayIndex == idx;
- final isMedDone = medBars[idx] >= 1.0;
- final isRoutineDone = routineBars[idx] >= 1.0;
- final isDayFullyDone = isMedDone && isRoutineDone;
-
- return Padding(
- padding: const EdgeInsets.only(right: 8),
- child: InkWell(
- onTap: () {
- setState(() {
- _selectedProgressDayIndex = idx;
- });
- },
- borderRadius: BorderRadius.circular(20),
- child: AnimatedContainer(
- duration: const Duration(milliseconds: 180),
- padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
- decoration: BoxDecoration(
- color: isSelected ? const Color(0xFF23B39B) : const Color(0xFFF1F5F9),
- borderRadius: BorderRadius.circular(20),
- border: Border.all(
- color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFCBD5E1),
- width: isSelected ? 2.0 : 1.2,
- ),
- boxShadow: isSelected
- ? [
- BoxShadow(
- color: const Color(0xFF23B39B).withOpacity(0.35),
- blurRadius: 6,
- offset: const Offset(0, 2),
- ),
- ]
- : [],
- ),
- child: Row(
- mainAxisSize: MainAxisSize.min,
- children: [
- Text(
- daysOfWeek[idx],
- style: TextStyle(
- fontSize: 12.5,
- fontWeight: FontWeight.bold,
- color: isSelected ? Colors.white : const Color(0xFF334155),
- ),
- ),
- const SizedBox(width: 5),
- Icon(
- isDayFullyDone ? Icons.check_circle : Icons.schedule,
- size: 14,
- color: isSelected ? Colors.white : (isDayFullyDone ? const Color(0xFF16A34A) : Colors.amber.shade700),
- ),
- ],
- ),
- ),
- ),
- );
- }),
- ),
- ),
- const SizedBox(height: 16),
-
- // 💊 Medicine Weekly Adherence Card
- Container(
- padding: const EdgeInsets.all(12),
- decoration: BoxDecoration(
- color: const Color(0xFFF0FDF4),
- borderRadius: BorderRadius.circular(14),
- border: Border.all(color: const Color(0xFF86EFAC)),
- ),
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Row(
- mainAxisAlignment: MainAxisAlignment.spaceBetween,
- children: [
- Text(
- '💊 ${i18n.translate("medicineAdherence")}',
- style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
- ),
- Text(
- '${stats['completedMeds']}/${stats['totalMeds']} Completed • $medPct%',
- style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
- ),
- ],
- ),
- const SizedBox(height: 8),
- ClipRRect(
- borderRadius: BorderRadius.circular(6),
- child: LinearProgressIndicator(
- value: medPct / 100.0,
- minHeight: 8,
- backgroundColor: const Color(0xFFDCFCE7),
- valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
- ),
- ),
- const SizedBox(height: 12),
- Row(
- mainAxisAlignment: MainAxisAlignment.spaceAround,
- children: List.generate(7, (idx) {
- final isDone = medBars[idx] >= 1.0;
- final isSelected = _selectedProgressDayIndex == idx;
- return GestureDetector(
- onTap: () {
- setState(() {
- _selectedProgressDayIndex = idx;
- });
- },
- child: Column(
- children: [
- Text(
- daysOfWeek[idx],
- style: TextStyle(
- fontSize: 11,
- color: isSelected ? const Color(0xFF15803D) : Colors.black54,
- fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
- ),
- ),
- const SizedBox(height: 4),
- AnimatedContainer(
- duration: const Duration(milliseconds: 150),
- width: 26,
- height: 26,
- decoration: BoxDecoration(
- color: isDone ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
- shape: BoxShape.circle,
- border: isSelected ? Border.all(color: const Color(0xFF14532D), width: 2.5) : null,
- boxShadow: isSelected
- ? [
- BoxShadow(
- color: const Color(0xFF16A34A).withOpacity(0.4),
- blurRadius: 6,
- spreadRadius: 1,
- )
- ]
- : [],
- ),
- child: Icon(
- isDone ? Icons.check : Icons.schedule,
- size: 14,
- color: Colors.white,
- ),
- ),
- ],
- ),
- );
- }),
- ),
- ],
- ),
- ),
- const SizedBox(height: 12),
-
- // 🏃‍♂️ Daily Routine Weekly Adherence Card
- Container(
- padding: const EdgeInsets.all(12),
- decoration: BoxDecoration(
- color: const Color(0xFFF0F9FF),
- borderRadius: BorderRadius.circular(14),
- border: Border.all(color: const Color(0xFFBAE6FD)),
- ),
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Row(
- mainAxisAlignment: MainAxisAlignment.spaceBetween,
- children: [
- Text(
- '🏃‍♂️ ${i18n.translate("routineAdherence")}',
- style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF075985)),
- ),
- Text(
- '${stats['completedRoutines']}/${stats['totalRoutines']} Completed • $routinePct%',
- style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
- ),
- ],
- ),
- const SizedBox(height: 8),
- ClipRRect(
- borderRadius: BorderRadius.circular(6),
- child: LinearProgressIndicator(
- value: routinePct / 100.0,
- minHeight: 8,
- backgroundColor: const Color(0xFFE0F2FE),
- valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0284C7)),
- ),
- ),
- const SizedBox(height: 12),
- Row(
- mainAxisAlignment: MainAxisAlignment.spaceAround,
- children: List.generate(7, (idx) {
- final isDone = routineBars[idx] >= 1.0;
- final isSelected = _selectedProgressDayIndex == idx;
- return GestureDetector(
- onTap: () {
- setState(() {
- _selectedProgressDayIndex = idx;
- });
- },
- child: Column(
- children: [
- Text(
- daysOfWeek[idx],
- style: TextStyle(
- fontSize: 11,
- color: isSelected ? const Color(0xFF0369A1) : Colors.black54,
- fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
- ),
- ),
- const SizedBox(height: 4),
- AnimatedContainer(
- duration: const Duration(milliseconds: 150),
- width: 26,
- height: 26,
- decoration: BoxDecoration(
- color: isDone ? const Color(0xFF0284C7) : const Color(0xFFCBD5E1),
- shape: BoxShape.circle,
- border: isSelected ? Border.all(color: const Color(0xFF0C4A6E), width: 2.5) : null,
- boxShadow: isSelected
- ? [
- BoxShadow(
- color: const Color(0xFF0284C7).withOpacity(0.4),
- blurRadius: 6,
- spreadRadius: 1,
- )
- ]
- : [],
- ),
- child: Icon(
- isDone ? Icons.check : Icons.schedule,
- size: 14,
- color: Colors.white,
- ),
- ),
- ],
- ),
- );
- }),
- ),
- ],
- ),
- ),
- const SizedBox(height: 16),
-
- // 📅 Day-Wise Medicine & Routine Status Breakdown Section
- Container(
- padding: const EdgeInsets.all(14),
- decoration: BoxDecoration(
- color: const Color(0xFFFAF5FF),
- borderRadius: BorderRadius.circular(16),
- border: Border.all(color: const Color(0xFFD8B4FE), width: 1.5),
- ),
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Row(
- children: [
- const Text('📅', style: TextStyle(fontSize: 22)),
- const SizedBox(width: 8),
- Expanded(
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Text(
- '$selectedDayName Medicine & Routine Status',
- style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF6B21A8)),
- ),
- Text(
- i18n.translate('selectDayToView'),
- style: const TextStyle(fontSize: 11, color: Colors.black54),
- ),
- ],
- ),
- ),
- Chip(
- label: Text(
- selectedDayShort,
- style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
- ),
- backgroundColor: const Color(0xFF9333EA),
- ),
- ],
- ),
- const SizedBox(height: 12),
- if (medList.isEmpty && routineList.isEmpty) ...[
- const Padding(
- padding: EdgeInsets.symmetric(vertical: 12),
- child: Center(
- child: Text(
- 'No medicines or daily routines scheduled for this day.',
- style: TextStyle(fontSize: 12, color: Colors.grey),
- ),
- ),
- ),
- ] else ...[
- // Medicine items
- if (medList.isNotEmpty) ...[
- const Text(
- '💊 Medicine List',
- style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
- ),
- const SizedBox(height: 6),
- ...medList.map((m) {
- final isTaken = m.isCompletedForDay(_selectedProgressDayIndex);
- return Container(
- margin: const EdgeInsets.only(bottom: 8),
- padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
- decoration: BoxDecoration(
- color: isTaken ? const Color(0xFFDCFCE7) : const Color(0xFFFEF2F2),
- borderRadius: BorderRadius.circular(10),
- border: Border.all(color: isTaken ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5)),
- ),
- child: Row(
- mainAxisAlignment: MainAxisAlignment.spaceBetween,
- children: [
- Expanded(
- child: Row(
- children: [
- const Text('💊', style: TextStyle(fontSize: 18)),
- const SizedBox(width: 8),
- Expanded(
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Text(
- m.title,
- style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
- ),
- Text(
- '${m.time} • ${m.detail}',
- style: const TextStyle(fontSize: 11, color: Colors.black87),
- ),
- ],
- ),
- ),
- ],
- ),
- ),
- InkWell(
- onTap: () {
- schedule.toggleReminderCompletionForDay(m.id, _selectedProgressDayIndex);
- },
- child: Container(
- padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
- decoration: BoxDecoration(
- color: isTaken ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
- borderRadius: BorderRadius.circular(12),
- ),
- child: Row(
- mainAxisSize: MainAxisSize.min,
- children: [
- Icon(
- isTaken ? Icons.check_circle : Icons.cancel,
- size: 14,
- color: Colors.white,
- ),
- const SizedBox(width: 4),
- Text(
- isTaken ? i18n.translate('statusTaken') : i18n.translate('statusYetToTake'),
- style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
- ),
- ],
- ),
- ),
- ),
- ],
- ),
- );
- }).toList(),
- const SizedBox(height: 8),
- ],
-
- // Routine items
- if (routineList.isNotEmpty) ...[
- const Text(
- '🏃‍♂️ Daily Routine List',
- style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF075985)),
- ),
- const SizedBox(height: 6),
- ...routineList.map((r) {
- final isDone = r.isCompletedForDay(_selectedProgressDayIndex);
- return Container(
- margin: const EdgeInsets.only(bottom: 8),
- padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
- decoration: BoxDecoration(
- color: isDone ? const Color(0xFFE0F2FE) : const Color(0xFFFFFBEB),
- borderRadius: BorderRadius.circular(10),
- border: Border.all(color: isDone ? const Color(0xFFBAE6FD) : const Color(0xFFFDE68A)),
- ),
- child: Row(
- mainAxisAlignment: MainAxisAlignment.spaceBetween,
- children: [
- Expanded(
- child: Row(
- children: [
- const Text('🏃‍♂️', style: TextStyle(fontSize: 18)),
- const SizedBox(width: 8),
- Expanded(
- child: Column(
- crossAxisAlignment: CrossAxisAlignment.start,
- children: [
- Text(
- r.title,
- style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
- ),
- Text(
- '${r.time} • ${r.detail}',
- style: const TextStyle(fontSize: 11, color: Colors.black87),
- ),
- ],
- ),
- ),
- ],
- ),
- ),
- InkWell(
- onTap: () {
- schedule.toggleReminderCompletionForDay(r.id, _selectedProgressDayIndex);
- },
- child: Container(
- padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
- decoration: BoxDecoration(
- color: isDone ? const Color(0xFF0284C7) : const Color(0xFFD97706),
- borderRadius: BorderRadius.circular(12),
- ),
- child: Row(
- mainAxisSize: MainAxisSize.min,
- children: [
- Icon(
- isDone ? Icons.check_circle : Icons.schedule,
- size: 14,
- color: Colors.white,
- ),
- const SizedBox(width: 4),
- Text(
- isDone ? i18n.translate('completedStatus') : i18n.translate('pendingStatus'),
- style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
- ),
- ],
- ),
- ),
- ),
- ],
- ),
- );
- }).toList(),
- ],
- ],
- ],
- ),
- ),
- ],
- ),
- );
- }
-
- Widget _buildMealVoiceNotesSection(I18nService i18n, ScheduleService schedule) {
+  Widget _buildMealVoiceNotesSection(I18nService i18n, ScheduleService schedule) {
  final isTamil = i18n.currentLang == 'ta';
  final meals = [
  {

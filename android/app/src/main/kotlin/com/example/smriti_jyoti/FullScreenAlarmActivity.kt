@@ -49,12 +49,17 @@ class FullScreenAlarmActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
+            try {
+                val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                keyguardManager.requestDismissKeyguard(this, null)
+            } catch (_: Exception) {}
         }
         @Suppress("DEPRECATION")
         window.addFlags(
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
                     WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
@@ -62,11 +67,12 @@ class FullScreenAlarmActivity : Activity() {
         // 2. Enable Immersive Sticky Mode to hide navigation bar & status bar
         enableImmersiveMode()
 
-        // 3. Acquire Partial WakeLock
+        // 3. Acquire FULL WakeLock to turn physical display bright
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            @Suppress("DEPRECATION")
             wakeLock = powerManager.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "Aninai:FullScreenAlarmWakeLock"
             )
             wakeLock?.acquire(30000)
@@ -91,7 +97,8 @@ class FullScreenAlarmActivity : Activity() {
                 title.contains("Daily Activity") || title.contains("தினசரி") || title.contains("dinasari")
         val isAppt = reminderId.startsWith("apt_") || reminderId.contains("apt") || reminderId.contains("appointment") ||
                 title.contains("Appointment") || title.contains("சந்திப்பு") || title.contains("sandhippu") || title.contains("Doctor")
-        val disableAnimation = isRoutine || isAppt
+        val isMedicine = !isRoutine && !isAppt && !isHydration
+        val disableAnimation = isMedicine
 
         val takenLabel = if (isHydration) {
             if (langCode == "ta") "💧 1 டம்ளர் தண்ணீர் பதிவுசெய்" else "💧 Log 1 Glass Water"

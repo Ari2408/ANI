@@ -16,7 +16,7 @@ import androidx.core.app.NotificationCompat
 import java.util.Locale
 
 class AlarmReceiver : BroadcastReceiver() {
-    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v4"
+    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v5"
     private val NOTIFICATION_CHANNEL_NAME = "Aninai Reminders"
 
     companion object {
@@ -163,17 +163,19 @@ class AlarmReceiver : BroadcastReceiver() {
 
             // 1. Wake screen & acquire wake lock so alarm delivers even if screen is locked/off
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            @Suppress("DEPRECATION")
             val wakeLock = powerManager.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "Aninai:AlarmWakeLock"
             )
-            wakeLock.acquire(15000)
+            wakeLock.acquire(30000)
 
             // 1b. Launch FullScreenAlarmActivity to arrest screen until an option button is selected (Suppressed for Hydration)
             if (attemptCount < 4 && !isHydration && reminderId != "hyd") {
                 try {
                     val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        addCategory(NotificationCompat.CATEGORY_ALARM)
                         putExtra("notificationId", id)
                         putExtra("reminderId", reminderId)
                         putExtra("title", displayTitle)
@@ -184,13 +186,17 @@ class AlarmReceiver : BroadcastReceiver() {
                         putExtra("langCode", langCode)
                         putExtra("medicineImagePath", medicineImagePath)
                         putExtra("pillsCount", pillsCount)
+                        putExtra("customVoicePath", effectiveCustomVoicePath)
+                        putExtra("voiceMode", effectiveVoiceMode)
                     }
                     val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
                     val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, piFlags)
                     try {
                         context.startActivity(fullScreenIntent)
                     } catch (e: Exception) {
-                        fullScreenPendingIntent.send()
+                        try {
+                            fullScreenPendingIntent.send()
+                        } catch (_: Exception) {}
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("AninaiAlarm", "Error launching FullScreenAlarmActivity directly", e)
@@ -198,7 +204,7 @@ class AlarmReceiver : BroadcastReceiver() {
             }
 
             // 2. Show High Priority System Notification Banner
-            showSystemNotification(context, id, reminderId, displayTitle, displayBody, takenLabel, yetToTakeLabel, isHydration, showActions, langCode, medicineImagePath, pillsCount)
+            showSystemNotification(context, id, reminderId, displayTitle, displayBody, takenLabel, yetToTakeLabel, isHydration, showActions, langCode, medicineImagePath, pillsCount, effectiveCustomVoicePath, effectiveVoiceMode)
 
             // 3. For 4th Notification (Caregiver Alert), play Emergency Beep Alarm Sound instead of voice!
             if (attemptCount >= 4) {
@@ -762,7 +768,9 @@ class AlarmReceiver : BroadcastReceiver() {
         showActions: Boolean = true,
         langCode: String = "en",
         medicineImagePath: String = "",
-        pillsCount: String = ""
+        pillsCount: String = "",
+        customVoicePath: String = "",
+        voiceMode: Int = 0
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -794,6 +802,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
         val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            addCategory(NotificationCompat.CATEGORY_ALARM)
             putExtra("notificationId", id)
             putExtra("reminderId", reminderId)
             putExtra("title", title)
@@ -804,6 +813,8 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra("langCode", langCode)
             putExtra("medicineImagePath", medicineImagePath)
             putExtra("pillsCount", pillsCount)
+            putExtra("customVoicePath", customVoicePath)
+            putExtra("voiceMode", voiceMode)
         }
         val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, activityFlags)
 
