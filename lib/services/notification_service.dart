@@ -159,7 +159,7 @@ class NotificationService {
         File? latest;
         for (var d in searchDirs) {
           if (d.existsSync()) {
-            final files = d.listSync().whereType<File>().where((f) => (f.path.contains('custom_reminder_voice_') || f.path.contains('meal_voice_')) && f.path.endsWith('.m4a') && f.lengthSync() > 0);
+            final files = d.listSync().whereType<File>().where((f) => (f.path.contains('hydration_voice_') || f.path.contains('custom_reminder_voice_') || f.path.contains('meal_voice_')) && f.path.endsWith('.m4a') && f.lengthSync() > 0);
             for (var f in files) {
               if (latest == null || f.lastModifiedSync().isAfter(latest.lastModifiedSync())) {
                 latest = f;

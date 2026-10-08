@@ -1894,6 +1894,37 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  ],
  ),
  if (_hydrationCustomVoicePath != null && File(_hydrationCustomVoicePath!).existsSync()) ...[
+ const SizedBox(height: 8),
+ Row(
+ children: [
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF16A34A),
+ padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ onPressed: () {
+ schedule.setHydrationVoiceConfig(1, _hydrationCustomVoicePath, i18n: i18n);
+ ScaffoldMessenger.of(context).showSnackBar(
+ SnackBar(
+ content: Text(
+ isTamil ? 'குடிநீர் குரல் பதிவு வெற்றிகரமாக சேமிக்கப்பட்டது! மணிநேர நினைவூட்டலில் ஒலிக்கும்.' : 'Custom Hydration Voice Note Saved & Active for Hourly Alert!',
+ ),
+ backgroundColor: const Color(0xFF16A34A),
+ duration: const Duration(seconds: 3),
+ ),
+ );
+ },
+ icon: const Icon(Icons.save, color: Colors.white, size: 18),
+ label: Text(
+ isTamil ? 'குரல் பதிவை சேமி (Save Voice Note)' : 'Save Voice Note',
+ style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+ ),
+ ),
+ ),
+ ],
+ ),
  const SizedBox(height: 6),
  Container(
  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

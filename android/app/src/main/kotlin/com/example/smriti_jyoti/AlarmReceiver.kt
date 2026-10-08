@@ -56,6 +56,10 @@ class AlarmReceiver : BroadcastReceiver() {
                     android.util.Log.d("AninaiTTS", "Attempts 1-3 are Elder only. Suppressing for Caregiver.")
                     return
                 }
+                if (attemptCount >= 4 && !isCaretaker) {
+                    android.util.Log.d("AninaiTTS", "Attempt 4 Caregiver SOS alert is Caregiver only. Suppressing for Elder.")
+                    return
+                }
             } catch (e: Exception) {
                 android.util.Log.e("AninaiTTS", "Error checking caregiver role in AlarmReceiver", e)
             }
@@ -102,7 +106,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
             if (!isAppt && effectiveCustomVoicePath.isNotEmpty() && java.io.File(effectiveCustomVoicePath).exists() && java.io.File(effectiveCustomVoicePath).length() > 0) {
                 effectiveVoiceMode = 1
-            } else if (!isAppt && (isRoutine || reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine"))) {
+            } else if (!isAppt && (isHydration || reminderId == "hyd" || isRoutine || reminderId.startsWith("act_") || reminderId.contains("act") || reminderId.contains("routine"))) {
                 try {
                     val dataDir = context.applicationInfo.dataDir
                     val searchDirs = listOf(
@@ -114,7 +118,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     for (dir in searchDirs) {
                         if (dir.exists() && dir.isDirectory) {
                             dir.listFiles()?.filter { f ->
-                                f.isFile && f.name.contains("custom_reminder_voice_") && f.name.endsWith(".m4a") && f.length() > 0
+                                f.isFile && (f.name.contains("hydration_voice_") || f.name.contains("custom_reminder_voice_") || f.name.contains("meal_voice_")) && f.name.endsWith(".m4a") && f.length() > 0
                             }?.forEach { f ->
                                 if (latestFile == null || f.lastModified() > latestFile!!.lastModified()) {
                                     latestFile = f
@@ -122,10 +126,10 @@ class AlarmReceiver : BroadcastReceiver() {
                             }
                         }
                     }
-                    if (latestFile != null) {
+                    if (latestFile != null && effectiveCustomVoicePath.isEmpty()) {
                         effectiveCustomVoicePath = latestFile!!.absolutePath
                         effectiveVoiceMode = 1
-                        android.util.Log.d("AninaiTTS", "Auto-attached latest custom voice file for native routine alarm: $effectiveCustomVoicePath")
+                        android.util.Log.d("AninaiTTS", "Auto-attached latest custom/hydration voice file for native alarm: $effectiveCustomVoicePath")
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("AninaiTTS", "Error finding latest custom voice file natively", e)
