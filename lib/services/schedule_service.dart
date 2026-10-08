@@ -1721,6 +1721,93 @@ class ScheduleService extends ChangeNotifier {
  saveSchedules();
  }
 
+ /// Updates an existing medical appointment by ID and reschedules its alarm
+ void updateMedicalAppointment({
+ required String id,
+ required String title,
+ required String dateTime,
+ required String location,
+ String medicineImagePath = '',
+ I18nService? i18n,
+ }) {
+ if (i18n != null) _i18n = i18n;
+ final index = _reminders.indexWhere((r) => r.id == id);
+ if (index == -1) return;
+
+ final existingItem = _reminders[index];
+ final updatedItem = ReminderItem(
+ id: id,
+ type: ReminderType.appointment,
+ title: title,
+ time: dateTime,
+ detail: location.isNotEmpty ? location : 'Consultation Visit',
+ customVoicePath: existingItem.customVoicePath,
+ voiceMode: existingItem.voiceMode,
+ clonedVoiceSamplePath: existingItem.clonedVoiceSamplePath,
+ isCompleted: existingItem.isCompleted,
+ completedDays: existingItem.completedDays,
+ reminderAttempt: existingItem.reminderAttempt,
+ createdByRole: existingItem.createdByRole,
+ medicineImagePath: medicineImagePath,
+ repeatOption: existingItem.repeatOption,
+ selectedDays: existingItem.selectedDays,
+ startDate: existingItem.startDate,
+ );
+
+ _scheduledTimers[id]?.cancel();
+ _scheduledTimers.remove(id);
+ NotificationService.cancelAlarm(id.hashCode.abs() % 100000);
+
+ _reminders[index] = updatedItem;
+ _scheduleReminderTimer(updatedItem, i18n: i18n);
+ saveSchedules();
+ }
+
+ /// Updates an existing daily activity routine by ID and reschedules its alarm
+ void updateDailyActivity({
+ required String id,
+ required String activityTitle,
+ required String time,
+ required String details,
+ String customVoicePath = '',
+ int voiceMode = 0,
+ String clonedVoiceSamplePath = '',
+ String medicineImagePath = '',
+ I18nService? i18n,
+ }) {
+ if (i18n != null) _i18n = i18n;
+ final index = _reminders.indexWhere((r) => r.id == id);
+ if (index == -1) return;
+
+ final existingItem = _reminders[index];
+ final updatedItem = ReminderItem(
+ id: id,
+ type: ReminderType.routine,
+ title: activityTitle,
+ time: time,
+ detail: details.isNotEmpty ? details : 'Daily Routine Activity',
+ customVoicePath: customVoicePath,
+ voiceMode: voiceMode,
+ clonedVoiceSamplePath: clonedVoiceSamplePath,
+ isCompleted: existingItem.isCompleted,
+ completedDays: existingItem.completedDays,
+ reminderAttempt: existingItem.reminderAttempt,
+ createdByRole: existingItem.createdByRole,
+ medicineImagePath: medicineImagePath,
+ repeatOption: existingItem.repeatOption,
+ selectedDays: existingItem.selectedDays,
+ startDate: existingItem.startDate,
+ );
+
+ _scheduledTimers[id]?.cancel();
+ _scheduledTimers.remove(id);
+ NotificationService.cancelAlarm(id.hashCode.abs() % 100000);
+
+ _reminders[index] = updatedItem;
+ _scheduleReminderTimer(updatedItem, i18n: i18n);
+ saveSchedules();
+ }
+
  void addMedicineRoutine({
  required String medicineName,
  required String pillsCount,

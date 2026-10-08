@@ -801,6 +801,423 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  );
  }
 
+ void _showEditAppointmentDialog(BuildContext context, ReminderItem item, I18nService i18n, ScheduleService schedule) {
+ final isTa = i18n.currentLang == 'ta';
+
+ final titleCtrl = TextEditingController(text: item.title);
+ final timeCtrl = TextEditingController(text: item.time);
+ final locationCtrl = TextEditingController(text: item.detail);
+ String? editImagePath = item.medicineImagePath.isNotEmpty ? item.medicineImagePath : null;
+
+ showDialog(
+ context: context,
+ builder: (dialogCtx) {
+ return StatefulBuilder(
+ builder: (context, setDialogState) {
+ return AlertDialog(
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+ title: Row(
+ children: [
+ const Icon(Icons.edit, color: Color(0xFF0284C7)),
+ const SizedBox(width: 8),
+ Expanded(
+ child: Text(
+ isTa ? 'சந்திப்பைத் திருத்து' : 'Edit Doctor Appointment',
+ style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+ ),
+ ),
+ ],
+ ),
+ content: SingleChildScrollView(
+ child: Column(
+ mainAxisSize: MainAxisSize.min,
+ children: [
+ TextField(
+ controller: titleCtrl,
+ decoration: InputDecoration(
+ labelText: isTa ? 'சந்திப்பு தலைப்பு' : 'Appointment Title',
+ filled: true,
+ fillColor: Colors.white,
+ border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ ),
+ const SizedBox(height: 8),
+ TextField(
+ controller: timeCtrl,
+ readOnly: true,
+ onTap: () async {
+ final TimeOfDay? picked = await showTimePicker(
+ context: context,
+ initialTime: const TimeOfDay(hour: 10, minute: 0),
+ );
+ if (picked != null) {
+ final now = DateTime.now();
+ final dt = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+ final formatted = DateFormat('hh:mm a').format(dt);
+ setDialogState(() {
+ timeCtrl.text = formatted;
+ });
+ }
+ },
+ decoration: InputDecoration(
+ labelText: i18n.translate('timeToRemind'),
+ suffixIcon: const Icon(Icons.access_time),
+ filled: true,
+ fillColor: Colors.white,
+ border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ ),
+ const SizedBox(height: 8),
+ TextField(
+ controller: locationCtrl,
+ decoration: InputDecoration(
+ labelText: isTa ? 'இடம் / மருத்துவமனை' : 'Location / Clinic Detail',
+ filled: true,
+ fillColor: Colors.white,
+ border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ ),
+ const SizedBox(height: 8),
+ Container(
+ padding: const EdgeInsets.all(8),
+ decoration: BoxDecoration(
+ color: Colors.white,
+ borderRadius: BorderRadius.circular(10),
+ border: Border.all(color: const Color(0xFF61C5B0)),
+ ),
+ child: Column(
+ children: [
+ Row(
+ children: [
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF0284C7),
+ padding: const EdgeInsets.symmetric(vertical: 8),
+ ),
+ icon: const Icon(Icons.upload_file, color: Colors.white, size: 16),
+ label: Text(
+ editImagePath != null && File(editImagePath!).existsSync()
+ ? (isTa ? 'படம் மாற்று' : 'Change Image')
+ : (isTa ? 'படம் தேர்வு செய்' : 'Select Image'),
+ style: const TextStyle(color: Colors.white, fontSize: 11),
+ ),
+ onPressed: () async {
+ try {
+ final picker = ImagePicker();
+ final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+ if (image != null) {
+ setDialogState(() {
+ editImagePath = image.path;
+ });
+ }
+ } catch (e) {
+ debugPrint('Error picking image in edit: $e');
+ }
+ },
+ ),
+ ),
+ if (editImagePath != null && File(editImagePath!).existsSync()) ...[
+ IconButton(
+ icon: const Icon(Icons.cancel, color: Colors.red, size: 20),
+ onPressed: () {
+ setDialogState(() {
+ editImagePath = null;
+ });
+ },
+ ),
+ ],
+ ],
+ ),
+ if (editImagePath != null && File(editImagePath!).existsSync()) ...[
+ const SizedBox(height: 6),
+ ClipRRect(
+ borderRadius: BorderRadius.circular(8),
+ child: Image.file(File(editImagePath!), height: 60, width: 60, fit: BoxFit.cover),
+ ),
+ ],
+ ],
+ ),
+ ),
+ ],
+ ),
+ ),
+ actions: [
+ TextButton(
+ onPressed: () => Navigator.of(dialogCtx).pop(),
+ child: Text(isTa ? 'ரத்துசெய்' : 'Cancel', style: const TextStyle(color: Colors.grey)),
+ ),
+ ElevatedButton(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF0284C7),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ onPressed: () {
+ final newTitle = titleCtrl.text.trim();
+ final newTime = timeCtrl.text.trim();
+ final newLoc = locationCtrl.text.trim();
+ if (newTitle.isEmpty) return;
+
+ schedule.updateMedicalAppointment(
+ id: item.id,
+ title: newTitle,
+ dateTime: newTime,
+ location: newLoc,
+ medicineImagePath: editImagePath ?? '',
+ i18n: i18n,
+ );
+
+ Navigator.of(dialogCtx).pop();
+ ScaffoldMessenger.of(context).showSnackBar(
+ SnackBar(content: Text(isTa ? 'சந்திப்பு புதுப்பிக்கப்பட்டது!' : 'Appointment updated successfully!')),
+ );
+ },
+ child: Text(isTa ? 'சேமி' : 'Save Changes', style: const TextStyle(color: Colors.white)),
+ ),
+ ],
+ );
+ },
+ );
+ },
+ );
+ }
+
+ void _showEditRoutineDialog(BuildContext context, ReminderItem item, I18nService i18n, ScheduleService schedule) {
+ final isTa = i18n.currentLang == 'ta';
+
+ final titleCtrl = TextEditingController(text: item.title);
+ final timeCtrl = TextEditingController(text: item.time);
+ final detailsCtrl = TextEditingController(text: item.detail);
+ String? editImagePath = item.medicineImagePath.isNotEmpty ? item.medicineImagePath : null;
+ int editVoiceMode = item.voiceMode;
+ String editVoicePath = item.customVoicePath;
+
+ showDialog(
+ context: context,
+ builder: (dialogCtx) {
+ return StatefulBuilder(
+ builder: (context, setDialogState) {
+ return AlertDialog(
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+ title: Row(
+ children: [
+ const Icon(Icons.edit, color: Color(0xFF0284C7)),
+ const SizedBox(width: 8),
+ Expanded(
+ child: Text(
+ isTa ? 'தினசரி செயல்பாட்டைத் திருத்து' : 'Edit Daily Activity Routine',
+ style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+ ),
+ ),
+ ],
+ ),
+ content: SingleChildScrollView(
+ child: Column(
+ mainAxisSize: MainAxisSize.min,
+ children: [
+ TextField(
+ controller: titleCtrl,
+ decoration: InputDecoration(
+ labelText: isTa ? 'செயல்பாட்டின் பெயர்' : 'Activity Name',
+ filled: true,
+ fillColor: Colors.white,
+ border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ ),
+ const SizedBox(height: 8),
+ TextField(
+ controller: timeCtrl,
+ readOnly: true,
+ onTap: () async {
+ final TimeOfDay? picked = await showTimePicker(
+ context: context,
+ initialTime: const TimeOfDay(hour: 7, minute: 0),
+ );
+ if (picked != null) {
+ final now = DateTime.now();
+ final dt = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+ final formatted = DateFormat('hh:mm a').format(dt);
+ setDialogState(() {
+ timeCtrl.text = formatted;
+ });
+ }
+ },
+ decoration: InputDecoration(
+ labelText: i18n.translate('timeToRemind'),
+ suffixIcon: const Icon(Icons.access_time),
+ filled: true,
+ fillColor: Colors.white,
+ border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ ),
+ const SizedBox(height: 8),
+ TextField(
+ controller: detailsCtrl,
+ decoration: InputDecoration(
+ labelText: isTa ? 'விவரங்கள் / வழிமுறைகள்' : 'Activity Details / Instructions',
+ filled: true,
+ fillColor: Colors.white,
+ border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ ),
+ const SizedBox(height: 8),
+ Container(
+ padding: const EdgeInsets.all(8),
+ decoration: BoxDecoration(
+ color: Colors.white,
+ borderRadius: BorderRadius.circular(10),
+ border: Border.all(color: const Color(0xFF61C5B0)),
+ ),
+ child: Column(
+ children: [
+ Row(
+ children: [
+ Expanded(
+ child: ElevatedButton.icon(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF0284C7),
+ padding: const EdgeInsets.symmetric(vertical: 8),
+ ),
+ icon: const Icon(Icons.upload_file, color: Colors.white, size: 16),
+ label: Text(
+ editImagePath != null && File(editImagePath!).existsSync()
+ ? (isTa ? 'படம் மாற்று' : 'Change Image')
+ : (isTa ? 'படம் தேர்வு செய்' : 'Select Image'),
+ style: const TextStyle(color: Colors.white, fontSize: 11),
+ ),
+ onPressed: () async {
+ try {
+ final picker = ImagePicker();
+ final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+ if (image != null) {
+ setDialogState(() {
+ editImagePath = image.path;
+ });
+ }
+ } catch (e) {
+ debugPrint('Error picking image in edit: $e');
+ }
+ },
+ ),
+ ),
+ if (editImagePath != null && File(editImagePath!).existsSync()) ...[
+ IconButton(
+ icon: const Icon(Icons.cancel, color: Colors.red, size: 20),
+ onPressed: () {
+ setDialogState(() {
+ editImagePath = null;
+ });
+ },
+ ),
+ ],
+ ],
+ ),
+ if (editImagePath != null && File(editImagePath!).existsSync()) ...[
+ const SizedBox(height: 6),
+ ClipRRect(
+ borderRadius: BorderRadius.circular(8),
+ child: Image.file(File(editImagePath!), height: 60, width: 60, fit: BoxFit.cover),
+ ),
+ ],
+ ],
+ ),
+ ),
+ ],
+ ),
+ ),
+ actions: [
+ TextButton(
+ onPressed: () => Navigator.of(dialogCtx).pop(),
+ child: Text(isTa ? 'ரத்துசெய்' : 'Cancel', style: const TextStyle(color: Colors.grey)),
+ ),
+ ElevatedButton(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: const Color(0xFF0284C7),
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ onPressed: () {
+ final newTitle = titleCtrl.text.trim();
+ final newTime = timeCtrl.text.trim();
+ final newDet = detailsCtrl.text.trim();
+ if (newTitle.isEmpty) return;
+
+ schedule.updateDailyActivity(
+ id: item.id,
+ activityTitle: newTitle,
+ time: newTime,
+ details: newDet,
+ customVoicePath: editVoicePath,
+ voiceMode: editVoiceMode,
+ medicineImagePath: editImagePath ?? '',
+ i18n: i18n,
+ );
+
+ Navigator.of(dialogCtx).pop();
+ ScaffoldMessenger.of(context).showSnackBar(
+ SnackBar(content: Text(isTa ? 'செயல்பாடு புதுப்பிக்கப்பட்டது!' : 'Activity updated successfully!')),
+ );
+ },
+ child: Text(isTa ? 'சேமி' : 'Save Changes', style: const TextStyle(color: Colors.white)),
+ ),
+ ],
+ );
+ },
+ );
+ },
+ );
+ }
+
+ void _confirmAndDeleteReminder(BuildContext context, ReminderItem item, I18nService i18n, ScheduleService schedule) {
+ final isTa = i18n.currentLang == 'ta';
+
+ showDialog(
+ context: context,
+ builder: (dialogCtx) {
+ return AlertDialog(
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+ title: Row(
+ children: [
+ const Icon(Icons.delete_forever, color: Colors.red),
+ const SizedBox(width: 8),
+ Expanded(
+ child: Text(
+ isTa ? 'நீக்குவதை உறுதிசெய்' : 'Confirm Delete',
+ style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+ ),
+ ),
+ ],
+ ),
+ content: Text(
+ isTa
+ ? '"${item.title}" நினைவூட்டலை நிச்சயமாக நீக்க விரும்புகிறீர்களா?'
+ : 'Are you sure you want to delete "${item.title}"?',
+ style: const TextStyle(fontSize: 14),
+ ),
+ actions: [
+ TextButton(
+ onPressed: () => Navigator.of(dialogCtx).pop(),
+ child: Text(isTa ? 'ரத்துசெய்' : 'Cancel', style: const TextStyle(color: Colors.grey)),
+ ),
+ ElevatedButton(
+ style: ElevatedButton.styleFrom(
+ backgroundColor: Colors.red,
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+ ),
+ onPressed: () {
+ schedule.deleteReminder(item.id);
+ Navigator.of(dialogCtx).pop();
+ ScaffoldMessenger.of(context).showSnackBar(
+ SnackBar(content: Text('${i18n.translate("reminderDeletedToast")}: ${item.title}')),
+ );
+ },
+ child: Text(isTa ? 'நீக்கு' : 'Delete', style: const TextStyle(color: Colors.white)),
+ ),
+ ],
+ );
+ },
+ );
+ }
+
  Widget _buildVoiceRecorderCard(I18nService i18n, {bool showGrandsonOption = true}) {
  final effectiveVoiceMode = (!showGrandsonOption) ? 1 : _voiceMode;
  return Container(
@@ -2846,24 +3263,25 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  ),
  onPressed: () => schedule.toggleReminderCompletion(r.id),
  ),
- if (r.type == ReminderType.medicine && (auth.isCaretaker || r.createdByRole == 'elder'))
  IconButton(
  padding: EdgeInsets.zero,
  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
  icon: const Icon(Icons.edit, color: Color(0xFF0284C7), size: 22),
- onPressed: () => _showEditMedicineDialog(context, r, i18n, schedule),
+ onPressed: () {
+ if (r.type == ReminderType.medicine) {
+ _showEditMedicineDialog(context, r, i18n, schedule);
+ } else if (r.type == ReminderType.appointment) {
+ _showEditAppointmentDialog(context, r, i18n, schedule);
+ } else if (r.type == ReminderType.routine) {
+ _showEditRoutineDialog(context, r, i18n, schedule);
+ }
+ },
  ),
- if (auth.isCaretaker || r.createdByRole == 'elder')
  IconButton(
  padding: EdgeInsets.zero,
- constraints: BoxConstraints(minWidth: 36, minHeight: 36),
- icon: Icon(Icons.delete_outline, color: Colors.red, size: 22),
- onPressed: () {
- schedule.deleteReminder(r.id);
- ScaffoldMessenger.of(context).showSnackBar(
- SnackBar(content: Text('${i18n.translate("reminderDeletedToast")}: ${r.title}')),
- );
- },
+ constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+ icon: const Icon(Icons.delete_outline, color: Colors.red, size: 22),
+ onPressed: () => _confirmAndDeleteReminder(context, r, i18n, schedule),
  ),
  ],
  ),
