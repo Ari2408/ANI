@@ -384,16 +384,16 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
 
  switch (item.repeatOption) {
  case 'weekdays':
- return isTa ? '💼 திங்கள் - வெள்ளி' : '💼 Mon to Fri';
+ return isTa ? 'திங்கள் - வெள்ளி' : 'Mon to Fri';
  case 'alternate':
- return isTa ? '🔄 ஒரு நாள் விட்டு ஒரு நாள்' : '🔄 Alternate Days';
+ return isTa ? 'ஒரு நாள் விட்டு ஒரு நாள்' : 'Alternate Days';
  case 'custom':
  final sorted = List<int>.from(item.selectedDays)..sort();
  final names = sorted.map((d) => d >= 0 && d < 7 ? dayLabels[d] : '').where((s) => s.isNotEmpty).join(', ');
- return isTa ? '⚙️ $names' : '⚙️ $names';
+ return names;
  case 'daily':
  default:
- return isTa ? '🔁 தினமும்' : '🔁 Daily';
+ return isTa ? 'தினமும்' : 'Daily';
  }
  }
 
@@ -441,19 +441,19 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  items: [
  DropdownMenuItem(
  value: 'daily',
- child: Text(isTa ? '📅 தினமும் (Daily)' : '📅 Daily'),
+ child: Text(isTa ? 'தினமும் (Daily)' : 'Daily'),
  ),
  DropdownMenuItem(
  value: 'weekdays',
- child: Text(isTa ? '💼 திங்கள் - வெள்ளி (Mon to Fri)' : '💼 Monday to Friday'),
+ child: Text(isTa ? 'திங்கள் - வெள்ளி (Mon to Fri)' : 'Monday to Friday'),
  ),
  DropdownMenuItem(
  value: 'alternate',
- child: Text(isTa ? '🔄 ஒரு நாள் விட்டு ஒரு நாள் (Alternate Days)' : '🔄 Alternate Days (1 day after 1 day)'),
+ child: Text(isTa ? 'ஒரு நாள் விட்டு ஒரு நாள் (Alternate Days)' : 'Alternate Days (1 day after 1 day)'),
  ),
  DropdownMenuItem(
  value: 'custom',
- child: Text(isTa ? '⚙️ விருப்பமான நாட்கள் (Custom Select)' : '⚙️ Custom Select Days'),
+ child: Text(isTa ? 'விருப்பமான நாட்கள் (Custom Select)' : 'Custom Select Days'),
  ),
  ],
  onChanged: (val) {
@@ -2657,8 +2657,6 @@ class _ScheduleRemindersScreenState extends State<ScheduleRemindersScreen> {
  children: [
  Row(
  children: [
- const Text('📊', style: TextStyle(fontSize: 26)),
- const SizedBox(width: 10),
  Expanded(
  child: Column(
  crossAxisAlignment: CrossAxisAlignment.start,
