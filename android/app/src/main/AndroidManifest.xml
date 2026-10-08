@@ -39,8 +39,8 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:excludeFromRecents="true"
-            android:taskAffinity=""
-            android:theme="@android:style/Theme.Light.NoTitleBar"
+            android:taskAffinity="com.example.smriti_jyoti.alarm"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale" />
         <activity
             android:name=".MainActivity"

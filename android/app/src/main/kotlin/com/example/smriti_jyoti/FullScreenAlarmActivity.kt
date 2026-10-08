@@ -49,16 +49,15 @@ class FullScreenAlarmActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            )
         }
-
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        @Suppress("DEPRECATION")
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN
+        )
 
         // 2. Enable Immersive Sticky Mode to hide navigation bar & status bar
         enableImmersiveMode()
@@ -427,7 +426,29 @@ class FullScreenAlarmActivity : Activity() {
                 @Suppress("DEPRECATION")
                 sendBroadcast(Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS))
             } catch (_: Exception) {}
+            val reorderIntent = Intent(this, FullScreenAlarmActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            }
+            startActivity(reorderIntent)
         }
+    }
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent?): Boolean {
+        if (!isAcknowledged && event != null) {
+            val keyCode = event.keyCode
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK ||
+                keyCode == android.view.KeyEvent.KEYCODE_HOME ||
+                keyCode == android.view.KeyEvent.KEYCODE_APP_SWITCH ||
+                keyCode == android.view.KeyEvent.KEYCODE_MENU ||
+                keyCode == android.view.KeyEvent.KEYCODE_SEARCH) {
+                if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                    val msg = if (currentLangCode == "ta") "நினைவூட்டலை உறுதிப்படுத்த ஏதேனும் 2 விருப்பங்களில் ஒன்றை அழுத்தவும்!" else "Please select one of the two options to acknowledge!"
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onUserLeaveHint() {
