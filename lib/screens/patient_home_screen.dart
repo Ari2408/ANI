@@ -1,3 +1,4 @@
+import 'schedule_reminders_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/i18n_service.dart';
@@ -353,7 +354,10 @@ class PatientHomeScreen extends StatelessWidget {
  if (schedule.reminders.isEmpty) ...[
  Text(i18n.translate('noRemindersSet'), style: TextStyle(fontSize: 12, color: Colors.grey)),
  ] else ...[
- ...schedule.reminders.take(3).map((r) => Container(
+ ...schedule.reminders.take(3).map((r) => InkWell(
+ onTap: () => showEditReminderDialog(context, r, i18n, schedule),
+ borderRadius: BorderRadius.circular(14),
+ child: Container(
  margin: const EdgeInsets.only(bottom: 6),
  padding: const EdgeInsets.all(10),
  decoration: BoxDecoration(
@@ -374,12 +378,27 @@ class PatientHomeScreen extends StatelessWidget {
  ],
  ),
  ),
+ const SizedBox(width: 4),
+ IconButton(
+ padding: EdgeInsets.zero,
+ constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+ icon: const Icon(Icons.edit, color: Color(0xFF0284C7), size: 20),
+ onPressed: () => showEditReminderDialog(context, r, i18n, schedule),
+ ),
+ IconButton(
+ padding: EdgeInsets.zero,
+ constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+ icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+ onPressed: () => confirmAndDeleteReminderDialog(context, r, i18n, schedule),
+ ),
+ const SizedBox(width: 4),
  Icon(
  r.isCompleted ? Icons.check_circle : Icons.circle_outlined,
  color: r.isCompleted ? const Color(0xFF23B39B) : Colors.grey,
  size: 24,
  ),
  ],
+ ),
  ),
  )).toList(),
  ],
