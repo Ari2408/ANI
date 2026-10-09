@@ -16,7 +16,7 @@ import androidx.core.app.NotificationCompat
 import java.util.Locale
 
 class AlarmReceiver : BroadcastReceiver() {
-    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v5"
+    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v6"
     private val NOTIFICATION_CHANNEL_NAME = "Aninai Reminders"
 
     companion object {
@@ -54,10 +54,6 @@ class AlarmReceiver : BroadcastReceiver() {
 
                 if (attemptCount < 4 && isCaretaker) {
                     android.util.Log.d("AninaiTTS", "Attempts 1-3 are Elder only. Suppressing for Caregiver.")
-                    return
-                }
-                if (attemptCount >= 4 && !isCaretaker) {
-                    android.util.Log.d("AninaiTTS", "Attempt 4 Caregiver SOS alert is Caregiver only. Suppressing for Elder.")
                     return
                 }
             } catch (e: Exception) {
@@ -171,10 +167,10 @@ class AlarmReceiver : BroadcastReceiver() {
             wakeLock.acquire(30000)
 
             // 1b. Launch FullScreenAlarmActivity to arrest screen until an option button is selected (Suppressed for Hydration)
-            if (attemptCount < 4 && !isHydration && reminderId != "hyd") {
+            if (!isHydration && reminderId != "hyd") {
                 try {
                     val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_USER_ACTION
                         addCategory(NotificationCompat.CATEGORY_ALARM)
                         putExtra("notificationId", id)
                         putExtra("reminderId", reminderId)
@@ -192,12 +188,11 @@ class AlarmReceiver : BroadcastReceiver() {
                     val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
                     val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, piFlags)
                     try {
+                        fullScreenPendingIntent.send()
+                    } catch (_: Exception) {}
+                    try {
                         context.startActivity(fullScreenIntent)
-                    } catch (e: Exception) {
-                        try {
-                            fullScreenPendingIntent.send()
-                        } catch (_: Exception) {}
-                    }
+                    } catch (_: Exception) {}
                 } catch (e: Exception) {
                     android.util.Log.e("AninaiAlarm", "Error launching FullScreenAlarmActivity directly", e)
                 }
@@ -801,7 +796,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val pendingIntent = PendingIntent.getActivity(context, id, launchIntent, activityFlags)
 
         val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_USER_ACTION
             addCategory(NotificationCompat.CATEGORY_ALARM)
             putExtra("notificationId", id)
             putExtra("reminderId", reminderId)
@@ -858,6 +853,12 @@ class AlarmReceiver : BroadcastReceiver() {
 
         if (!isHydration && reminderId != "hyd") {
             builder.setFullScreenIntent(fullScreenPendingIntent, true)
+            try {
+                fullScreenPendingIntent.send()
+            } catch (_: Exception) {}
+            try {
+                context.startActivity(fullScreenIntent)
+            } catch (_: Exception) {}
         }
 
         val isAppointment = isAppointmentReminder(reminderId, title, body)

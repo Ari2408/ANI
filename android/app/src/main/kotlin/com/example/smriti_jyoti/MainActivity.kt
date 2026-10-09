@@ -17,7 +17,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.aninai/notifications"
     private val STEP_CHANNEL = "com.aninai/step_tracker"
-    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v5"
+    private val NOTIFICATION_CHANNEL_ID = "aninai_reminders_v6"
     private val NOTIFICATION_CHANNEL_NAME = "Aninai Reminders"
     private var pendingActivityPermissionResult: MethodChannel.Result? = null
 
@@ -464,7 +464,7 @@ class MainActivity : FlutterActivity() {
         val pendingIntent = PendingIntent.getActivity(this, id, intent, activityFlags)
 
         val fullScreenIntent = Intent(this, FullScreenAlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_USER_ACTION
             addCategory(NotificationCompat.CATEGORY_ALARM)
             putExtra("notificationId", id)
             putExtra("reminderId", reminderId)
