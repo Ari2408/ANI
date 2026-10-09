@@ -479,7 +479,19 @@ class MainActivity : FlutterActivity() {
             putExtra("customVoicePath", customVoicePath)
             putExtra("voiceMode", voiceMode)
         }
-        val fullScreenPendingIntent = PendingIntent.getActivity(this, id * 10 + 9, fullScreenIntent, activityFlags)
+        val bgOptionsBundle: Bundle? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            try {
+                android.app.ActivityOptions.makeBasic().apply {
+                    setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                }.toBundle()
+            } catch (_: Exception) { null }
+        } else null
+
+        val fullScreenPendingIntent = if (bgOptionsBundle != null) {
+            PendingIntent.getActivity(this, id * 10 + 9, fullScreenIntent, activityFlags, bgOptionsBundle)
+        } else {
+            PendingIntent.getActivity(this, id * 10 + 9, fullScreenIntent, activityFlags)
+        }
 
         val broadcastFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -524,12 +536,19 @@ class MainActivity : FlutterActivity() {
         if (!isHydration && reminderId != "hyd") {
             builder.setFullScreenIntent(fullScreenPendingIntent, true)
             try {
-                startActivity(fullScreenIntent)
-            } catch (e: Exception) {
-                try {
+                if (bgOptionsBundle != null) {
+                    fullScreenPendingIntent.send(this, 0, null, null, null, null, bgOptionsBundle)
+                } else {
                     fullScreenPendingIntent.send()
-                } catch (_: Exception) {}
-            }
+                }
+            } catch (_: Exception) {}
+            try {
+                if (bgOptionsBundle != null) {
+                    startActivity(fullScreenIntent, bgOptionsBundle)
+                } else {
+                    startActivity(fullScreenIntent)
+                }
+            } catch (_: Exception) {}
         }
 
         val isAppointment = isAppointmentReminder(reminderId, title, body)

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.os.Build
+import android.os.Bundle
 import android.os.PowerManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -170,7 +171,7 @@ class AlarmReceiver : BroadcastReceiver() {
             if (!isHydration && reminderId != "hyd") {
                 try {
                     val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_USER_ACTION
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_USER_ACTION
                         addCategory(NotificationCompat.CATEGORY_ALARM)
                         putExtra("notificationId", id)
                         putExtra("reminderId", reminderId)
@@ -186,12 +187,28 @@ class AlarmReceiver : BroadcastReceiver() {
                         putExtra("voiceMode", effectiveVoiceMode)
                     }
                     val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
+                    val bgOptionsBundle: Bundle? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        try {
+                            android.app.ActivityOptions.makeBasic().apply {
+                                setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                            }.toBundle()
+                        } catch (_: Exception) { null }
+                    } else null
+
                     val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, piFlags)
                     try {
-                        fullScreenPendingIntent.send()
+                        if (bgOptionsBundle != null) {
+                            fullScreenPendingIntent.send(context, 0, null, null, null, null, bgOptionsBundle)
+                        } else {
+                            fullScreenPendingIntent.send()
+                        }
                     } catch (_: Exception) {}
                     try {
-                        context.startActivity(fullScreenIntent)
+                        if (bgOptionsBundle != null) {
+                            context.startActivity(fullScreenIntent, bgOptionsBundle)
+                        } else {
+                            context.startActivity(fullScreenIntent)
+                        }
                     } catch (_: Exception) {}
                 } catch (e: Exception) {
                     android.util.Log.e("AninaiAlarm", "Error launching FullScreenAlarmActivity directly", e)
@@ -796,7 +813,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val pendingIntent = PendingIntent.getActivity(context, id, launchIntent, activityFlags)
 
         val fullScreenIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_USER_ACTION
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_USER_ACTION
             addCategory(NotificationCompat.CATEGORY_ALARM)
             putExtra("notificationId", id)
             putExtra("reminderId", reminderId)
@@ -811,7 +828,19 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra("customVoicePath", customVoicePath)
             putExtra("voiceMode", voiceMode)
         }
-        val fullScreenPendingIntent = PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, activityFlags)
+        val bgOptionsBundle: Bundle? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            try {
+                android.app.ActivityOptions.makeBasic().apply {
+                    setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                }.toBundle()
+            } catch (_: Exception) { null }
+        } else null
+
+        val fullScreenPendingIntent = if (bgOptionsBundle != null) {
+            PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, activityFlags, bgOptionsBundle)
+        } else {
+            PendingIntent.getActivity(context, id * 10 + 9, fullScreenIntent, activityFlags)
+        }
 
         val broadcastFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -854,10 +883,18 @@ class AlarmReceiver : BroadcastReceiver() {
         if (!isHydration && reminderId != "hyd") {
             builder.setFullScreenIntent(fullScreenPendingIntent, true)
             try {
-                fullScreenPendingIntent.send()
+                if (bgOptionsBundle != null) {
+                    fullScreenPendingIntent.send(context, 0, null, null, null, null, bgOptionsBundle)
+                } else {
+                    fullScreenPendingIntent.send()
+                }
             } catch (_: Exception) {}
             try {
-                context.startActivity(fullScreenIntent)
+                if (bgOptionsBundle != null) {
+                    context.startActivity(fullScreenIntent, bgOptionsBundle)
+                } else {
+                    context.startActivity(fullScreenIntent)
+                }
             } catch (_: Exception) {}
         }
 
