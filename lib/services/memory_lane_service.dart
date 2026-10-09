@@ -22,6 +22,13 @@ class MemoryLaneService extends ChangeNotifier {
   final SpeechToText _speechToText = SpeechToText();
   final AudioPlayer _audioPlayer = AudioPlayer();
 
+  // Dedicated Music Player Engine for Favorite Music
+  final AudioPlayer _musicPlayer = AudioPlayer();
+  String? _currentlyPlayingMusicId;
+  PlayerState _musicPlayerState = PlayerState.stopped;
+  Duration _musicPosition = Duration.zero;
+  Duration _musicDuration = Duration.zero;
+
   bool _isRecording = false;
   int _recordSeconds = 0;
   Timer? _recordTimer;
@@ -46,6 +53,7 @@ class MemoryLaneService extends ChangeNotifier {
   MemoryLaneService() {
     _initMemories();
     _initAudioPlayerListeners();
+    _initMusicPlayerListeners();
   }
 
     String _getMimeType(String path) {
@@ -104,6 +112,40 @@ class MemoryLaneService extends ChangeNotifier {
     });
   }
 
+  void _initMusicPlayerListeners() {
+    try {
+      _musicPlayer.setReleaseMode(ReleaseMode.stop);
+    } catch (_) {}
+
+    _musicPlayer.onPlayerComplete.listen((_) {
+      debugPrint('MusicPlayer: Playback complete.');
+      _currentlyPlayingMusicId = null;
+      _musicPlayerState = PlayerState.completed;
+      _musicPosition = Duration.zero;
+      notifyListeners();
+    });
+
+    _musicPlayer.onPlayerStateChanged.listen((state) {
+      debugPrint('MusicPlayer state changed: $state');
+      _musicPlayerState = state;
+      if (state == PlayerState.completed || state == PlayerState.stopped) {
+        _currentlyPlayingMusicId = null;
+        _musicPosition = Duration.zero;
+      }
+      notifyListeners();
+    });
+
+    _musicPlayer.onPositionChanged.listen((pos) {
+      _musicPosition = pos;
+      notifyListeners();
+    });
+
+    _musicPlayer.onDurationChanged.listen((dur) {
+      _musicDuration = dur;
+      notifyListeners();
+    });
+  }
+
   List<MemoryItem> get memories => List.unmodifiable(_memories);
   List<MemoryItem> get musicMemories => List.unmodifiable(_memories.where((m) => m.category == 'music' || m.mediaType == 'audio').toList());
   List<MemoryItem> get placesMemories => List.unmodifiable(_memories.where((m) => m.category == 'places' || m.isPublicLandmark).toList());
@@ -116,6 +158,12 @@ class MemoryLaneService extends ChangeNotifier {
 
   String? get currentlyPlayingId => _currentlyPlayingId;
   bool get isPlayingVoiceNote => _isPlayingVoiceNote;
+
+  String? get currentlyPlayingMusicId => _currentlyPlayingMusicId;
+  bool get isMusicPlaying => _musicPlayerState == PlayerState.playing;
+  PlayerState get musicPlayerState => _musicPlayerState;
+  Duration get musicPosition => _musicPosition;
+  Duration get musicDuration => _musicDuration;
 
   Timer? _autoSyncTimer;
   bool _isAutoSyncRunning = false;
@@ -179,12 +227,30 @@ class MemoryLaneService extends ChangeNotifier {
         }
 
         // 2. Decode photo file from Base64
-        if (itemMap['imageBase64'] != null && itemMap['imageBase64'].toString().isNotEmpty) {
+        if (itemMap['photosBase64'] is List && (itemMap['photosBase64'] as List).isNotEmpty) {
+          try {
+            final List<String> localPhotos = [];
+            final pList = itemMap['photosBase64'] as List;
+            for (int pIdx = 0; pIdx < pList.length; pIdx++) {
+              final imgBytes = base64Decode(pList[pIdx].toString());
+              final imgFile = File('${appDir.path}/cloud_img_${itemId}_$pIdx.jpg');
+              await imgFile.writeAsBytes(imgBytes);
+              localPhotos.add(imgFile.path);
+            }
+            if (localPhotos.isNotEmpty) {
+              itemMap['photos'] = localPhotos;
+              itemMap['imagePath'] = localPhotos.first;
+            }
+          } catch (err) {
+            debugPrint('Error decoding photos array: $err');
+          }
+        } else if (itemMap['imageBase64'] != null && itemMap['imageBase64'].toString().isNotEmpty) {
           try {
             final imgBytes = base64Decode(itemMap['imageBase64'].toString());
             final imgFile = File('${appDir.path}/cloud_img_$itemId.jpg');
             await imgFile.writeAsBytes(imgBytes);
             itemMap['imagePath'] = imgFile.path;
+            itemMap['photos'] = [imgFile.path];
           } catch (err) {
             debugPrint('Error decoding photo file: $err');
           }
@@ -412,9 +478,166 @@ class MemoryLaneService extends ChangeNotifier {
     if (_currentlyPlayingId == id) {
       await stopVoiceNote();
     }
+    if (_currentlyPlayingMusicId == id) {
+      await stopMusic();
+    }
     _memories.removeWhere((m) => m.id == id);
     notifyListeners();
     await _saveCustomMemories();
+  }
+
+  Future<void> addFavoriteMusic({
+    required String title,
+    String? artist,
+    String? description,
+    required String audioPath,
+    String? fileName,
+    String? duration,
+    String createdByRole = 'caretaker',
+    void Function(String status)? onStatusChanged,
+  }) async {
+    onStatusChanged?.call('uploading');
+    final appDir = await getApplicationDocumentsDirectory();
+    final itemId = 'music_${DateTime.now().millisecondsSinceEpoch}';
+
+    String permanentPath = audioPath;
+    final clean = _cleanFilePath(audioPath);
+    if (!clean.startsWith('assets/') && !clean.startsWith('http')) {
+      final srcFile = File(clean);
+      if (srcFile.existsSync() && srcFile.lengthSync() > 0) {
+        try {
+          final ext = clean.contains('.') ? clean.split('.').last : 'mp3';
+          final permFile = File('${appDir.path}/favorite_music_${itemId}.$ext');
+          await srcFile.copy(permFile.path);
+          if (permFile.existsSync() && permFile.lengthSync() > 0) {
+            permanentPath = permFile.path;
+          }
+        } catch (e) {
+          debugPrint('Error saving favorite music permanently: $e');
+        }
+      }
+    }
+
+    // MP3 file upload and local storage complete, now saving metadata/database
+    onStatusChanged?.call('saving');
+
+    final newItem = MemoryItem(
+      id: itemId,
+      title: title,
+      artist: artist,
+      date: "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}",
+      imagePath: '',
+      audioPath: permanentPath,
+      voiceNotePath: permanentPath,
+      mediaType: 'audio',
+      category: 'music',
+      storyNote: description ?? '',
+      isCustom: true,
+      isPublicLandmark: false,
+      createdByRole: createdByRole,
+      fileName: fileName,
+      duration: duration,
+    );
+
+    _memories.insert(0, newItem);
+    notifyListeners();
+    await _saveCustomMemories();
+    onStatusChanged?.call('saved');
+  }
+
+  Future<void> addFavoritePlace({
+    required String placeName,
+    required String description,
+    required List<String> photos,
+    String? videoPath,
+    String? audioPath,
+    String createdByRole = 'caretaker',
+    void Function(String status)? onStatusChanged,
+  }) async {
+    onStatusChanged?.call('saving');
+    final appDir = await getApplicationDocumentsDirectory();
+    final itemId = 'place_${DateTime.now().millisecondsSinceEpoch}';
+
+    // Copy photos permanently
+    final List<String> permanentPhotos = [];
+    for (int i = 0; i < photos.length; i++) {
+      final p = photos[i];
+      final clean = _cleanFilePath(p);
+      if (!clean.startsWith('assets/') && !clean.startsWith('http')) {
+        final src = File(clean);
+        if (src.existsSync() && src.lengthSync() > 0) {
+          try {
+            final ext = clean.contains('.') ? clean.split('.').last : 'jpg';
+            final dest = File('${appDir.path}/place_photo_${itemId}_$i.$ext');
+            await src.copy(dest.path);
+            permanentPhotos.add(dest.path);
+          } catch (_) {
+            permanentPhotos.add(clean);
+          }
+        } else {
+          permanentPhotos.add(clean);
+        }
+      } else {
+        permanentPhotos.add(clean);
+      }
+    }
+
+    // Copy video permanently if local
+    String? permanentVideo = videoPath;
+    if (videoPath != null && videoPath.isNotEmpty) {
+      final clean = _cleanFilePath(videoPath);
+      if (!clean.startsWith('assets/') && !clean.startsWith('http')) {
+        final src = File(clean);
+        if (src.existsSync() && src.lengthSync() > 0) {
+          try {
+            final ext = clean.contains('.') ? clean.split('.').last : 'mp4';
+            final dest = File('${appDir.path}/place_video_${itemId}.$ext');
+            await src.copy(dest.path);
+            permanentVideo = dest.path;
+          } catch (_) {}
+        }
+      }
+    }
+
+    // Copy recorded narration permanently
+    String? permanentAudio = audioPath;
+    if (audioPath != null && audioPath.isNotEmpty) {
+      final clean = _cleanFilePath(audioPath);
+      if (!clean.startsWith('assets/') && !clean.startsWith('http')) {
+        final src = File(clean);
+        if (src.existsSync() && src.lengthSync() > 0) {
+          try {
+            final ext = clean.contains('.') ? clean.split('.').last : 'm4a';
+            final dest = File('${appDir.path}/place_story_${itemId}.$ext');
+            await src.copy(dest.path);
+            permanentAudio = dest.path;
+          } catch (_) {}
+        }
+      }
+    }
+
+    final newItem = MemoryItem(
+      id: itemId,
+      title: placeName,
+      date: "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}",
+      imagePath: permanentPhotos.isNotEmpty ? permanentPhotos.first : '',
+      videoPath: permanentVideo,
+      audioPath: permanentAudio,
+      voiceNotePath: permanentAudio,
+      mediaType: (permanentVideo != null && permanentVideo.isNotEmpty) ? 'video' : 'photo',
+      category: 'places',
+      storyNote: description,
+      photos: permanentPhotos,
+      isCustom: true,
+      isPublicLandmark: false,
+      createdByRole: createdByRole,
+    );
+
+    _memories.insert(0, newItem);
+    _lastRecordedVoiceNotePath = null;
+    notifyListeners();
+    await _saveCustomMemories();
+    onStatusChanged?.call('saved');
   }
 
   Future<void> _saveCustomMemories() async {
@@ -666,11 +889,144 @@ class MemoryLaneService extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- Favorite Music Playback Engine ---
+  Future<void> playMusic(MemoryItem item) async {
+    if (_currentlyPlayingMusicId == item.id) {
+      if (_musicPlayerState == PlayerState.playing) {
+        await pauseMusic();
+        return;
+      } else if (_musicPlayerState == PlayerState.paused) {
+        await resumeMusic();
+        return;
+      }
+    }
+
+    try {
+      await stopVoiceNote();
+      await _musicPlayer.stop();
+    } catch (_) {}
+
+    final audioPath = item.audioPath ?? '';
+    if (audioPath.isEmpty) return;
+
+    _currentlyPlayingMusicId = item.id;
+    _musicPlayerState = PlayerState.playing;
+    notifyListeners();
+
+    final clean = _cleanFilePath(audioPath);
+    try {
+      if (clean.startsWith('assets/')) {
+        await _musicPlayer.play(AssetSource(clean.replaceFirst('assets/', '')));
+      } else if (clean.startsWith('http')) {
+        await _musicPlayer.play(UrlSource(clean));
+      } else {
+        final file = File(clean);
+        if (file.existsSync()) {
+          try {
+            await _musicPlayer.play(DeviceFileSource(clean));
+          } catch (_) {
+            await _musicPlayer.play(UrlSource('file://$clean'));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error playing music track: $e');
+      _currentlyPlayingMusicId = null;
+      _musicPlayerState = PlayerState.stopped;
+      notifyListeners();
+    }
+  }
+
+  Future<void> pauseMusic() async {
+    try {
+      await _musicPlayer.pause();
+      _musicPlayerState = PlayerState.paused;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error pausing music: $e');
+    }
+  }
+
+  Future<void> resumeMusic() async {
+    try {
+      await _musicPlayer.resume();
+      _musicPlayerState = PlayerState.playing;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error resuming music: $e');
+    }
+  }
+
+  Future<void> seekMusic(Duration position) async {
+    try {
+      await _musicPlayer.seek(position);
+      _musicPosition = position;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error seeking music: $e');
+    }
+  }
+
+  Future<void> stopMusic() async {
+    try {
+      await _musicPlayer.stop();
+    } catch (_) {}
+    _currentlyPlayingMusicId = null;
+    _musicPlayerState = PlayerState.stopped;
+    _musicPosition = Duration.zero;
+    notifyListeners();
+  }
+
+  bool isItemOfflineAvailable(MemoryItem item) {
+    if (item.category == 'music' || item.mediaType == 'audio') {
+      final p = item.audioPath ?? '';
+      if (p.isEmpty) return false;
+      if (p.startsWith('assets/')) return true;
+      final clean = _cleanFilePath(p);
+      final file = File(clean);
+      return file.existsSync() && file.lengthSync() > 0;
+    } else if (item.category == 'places') {
+      bool hasAnyLocal = false;
+      if (item.photos.isNotEmpty) {
+        for (final photo in item.photos) {
+          if (photo.startsWith('assets/')) {
+            hasAnyLocal = true;
+            break;
+          }
+          final f = File(_cleanFilePath(photo));
+          if (f.existsSync() && f.lengthSync() > 0) {
+            hasAnyLocal = true;
+            break;
+          }
+        }
+      }
+      if (item.imagePath.isNotEmpty) {
+        if (item.imagePath.startsWith('assets/')) hasAnyLocal = true;
+        final f = File(_cleanFilePath(item.imagePath));
+        if (f.existsSync() && f.lengthSync() > 0) hasAnyLocal = true;
+      }
+      if (item.videoPath != null && item.videoPath!.isNotEmpty) {
+        final f = File(_cleanFilePath(item.videoPath!));
+        if (f.existsSync() && f.lengthSync() > 0) hasAnyLocal = true;
+      }
+      if (item.audioPath != null && item.audioPath!.isNotEmpty) {
+        final f = File(_cleanFilePath(item.audioPath!));
+        if (f.existsSync() && f.lengthSync() > 0) hasAnyLocal = true;
+      }
+      return hasAnyLocal;
+    } else {
+      // personal memory
+      final f = File(_cleanFilePath(item.imagePath));
+      return item.imagePath.startsWith('assets/') || (f.existsSync() && f.lengthSync() > 0);
+    }
+  }
+
   @override
   void dispose() {
     _recordTimer?.cancel();
     _audioRecorder.dispose();
     _audioPlayer.dispose();
+    _musicPlayer.dispose();
     super.dispose();
   }
 }
