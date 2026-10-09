@@ -14,6 +14,10 @@ class MemoryItem {
   final bool isCustom;
   final bool isPublicLandmark;
   final String createdByRole; // 'elder' or 'caretaker'
+  final String? artist; // For Favourite Music artist
+  final List<String> photos; // For Favourite Places multiple photos
+  final String? fileName; // Optional original file name
+  final String? duration; // Optional track duration (e.g. 03:45)
 
   MemoryItem({
     required this.id,
@@ -31,6 +35,10 @@ class MemoryItem {
     this.isCustom = false,
     this.isPublicLandmark = true,
     this.createdByRole = 'caretaker',
+    this.artist,
+    this.photos = const [],
+    this.fileName,
+    this.duration,
   });
 
   String get year {
@@ -58,6 +66,10 @@ class MemoryItem {
         'isCustom': isCustom,
         'isPublicLandmark': isPublicLandmark,
         'createdByRole': createdByRole,
+        'artist': artist,
+        'photos': photos,
+        'fileName': fileName,
+        'duration': duration,
       };
 
   factory MemoryItem.fromJson(Map<String, dynamic> json) {
@@ -74,12 +86,20 @@ class MemoryItem {
       }
     }
 
+    final rawPhotos = json['photos'];
+    List<String> parsedPhotos = [];
+    if (rawPhotos is List) {
+      parsedPhotos = rawPhotos.map((e) => e.toString()).toList();
+    } else if (json['imagePath'] != null && json['imagePath'].toString().isNotEmpty) {
+      parsedPhotos = [json['imagePath'].toString()];
+    }
+
     return MemoryItem(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
       titleKey: json['titleKey'] ?? '',
       date: json['date'] ?? json['year'] ?? '',
-      imagePath: json['imagePath'] ?? '',
+      imagePath: json['imagePath'] ?? (parsedPhotos.isNotEmpty ? parsedPhotos.first : ''),
       videoPath: json['videoPath'],
       audioPath: json['audioPath'],
       mediaType: media,
@@ -90,6 +110,10 @@ class MemoryItem {
       isCustom: json['isCustom'] ?? false,
       isPublicLandmark: isLandmark,
       createdByRole: json['createdByRole'] ?? 'caretaker',
+      artist: json['artist'],
+      photos: parsedPhotos,
+      fileName: json['fileName'],
+      duration: json['duration'],
     );
   }
 

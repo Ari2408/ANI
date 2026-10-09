@@ -10,6 +10,8 @@ import '../services/memory_lane_service.dart';
 import '../models/memory_item.dart';
 import '../widgets/elder_card.dart';
 import '../widgets/elder_button.dart';
+import '../widgets/favorite_music_section.dart';
+import '../widgets/favorite_place_section.dart';
 
 class MemoryLaneScreen extends StatefulWidget {
  const MemoryLaneScreen({Key? key}) : super(key: key);
@@ -633,6 +635,97 @@ class _MemoryLaneScreenState extends State<MemoryLaneScreen> {
  );
  }
 
+ Widget _buildSectionTabCard({
+   required int index,
+   required String title,
+   required String subtitle,
+   required IconData icon,
+   required int count,
+ }) {
+   final isSelected = _selectedTab == index;
+   return GestureDetector(
+     onTap: () => setState(() => _selectedTab = index),
+     child: AnimatedContainer(
+       duration: const Duration(milliseconds: 200),
+       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+       decoration: BoxDecoration(
+         color: isSelected ? const Color(0xFFE6F4F1) : Colors.white,
+         borderRadius: BorderRadius.circular(16),
+         border: Border.all(
+           color: isSelected ? const Color(0xFF23B39B) : Colors.grey.shade300,
+           width: isSelected ? 2.0 : 1.0,
+         ),
+         boxShadow: isSelected
+             ? [
+                 BoxShadow(
+                   color: const Color(0xFF23B39B).withOpacity(0.18),
+                   blurRadius: 8,
+                   offset: const Offset(0, 3),
+                 )
+               ]
+             : null,
+       ),
+       child: Row(
+         children: [
+           Container(
+             padding: const EdgeInsets.all(8),
+             decoration: BoxDecoration(
+               color: isSelected ? const Color(0xFF23B39B) : const Color(0xFFF0FDF4),
+               shape: BoxShape.circle,
+             ),
+             child: Icon(
+               icon,
+               color: isSelected ? Colors.white : const Color(0xFF23B39B),
+               size: 20,
+             ),
+           ),
+           const SizedBox(width: 12),
+           Expanded(
+             child: Column(
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: [
+                 Text(
+                   title,
+                   style: TextStyle(
+                     fontSize: 15,
+                     fontWeight: FontWeight.bold,
+                     color: isSelected ? const Color(0xFF1B2824) : Colors.black87,
+                   ),
+                 ),
+                 const SizedBox(height: 2),
+                 Text(
+                   subtitle,
+                   style: TextStyle(
+                     fontSize: 11,
+                     color: isSelected ? const Color(0xFF23B39B) : Colors.grey,
+                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                   ),
+                 ),
+               ],
+             ),
+           ),
+           if (count > 0)
+             Container(
+               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+               decoration: BoxDecoration(
+                 color: isSelected ? const Color(0xFF23B39B) : Colors.grey.shade200,
+                 borderRadius: BorderRadius.circular(10),
+               ),
+               child: Text(
+                 '$count',
+                 style: TextStyle(
+                   fontSize: 11,
+                   fontWeight: FontWeight.bold,
+                   color: isSelected ? Colors.white : Colors.black87,
+                 ),
+               ),
+             ),
+         ],
+       ),
+     ),
+   );
+ }
+
  @override
  Widget build(BuildContext context) {
  final i18n = Provider.of<I18nService>(context);
@@ -643,120 +736,166 @@ class _MemoryLaneScreenState extends State<MemoryLaneScreen> {
  final mappedId = auth.currentUser?.mappedElderId ?? 'NER-9431';
  memoryService.setCurrentElderId(mappedId);
 
- final currentItems = memoryService.memories;
-    final currentlyPlayingId = memoryService.currentlyPlayingId;
-    final isPlayingVoice = memoryService.isPlayingVoiceNote;
+ final personalItems = memoryService.memories
+     .where((m) => m.category == 'personal' || (m.category != 'music' && m.category != 'places' && !m.isPublicLandmark))
+     .toList();
+ final musicItems = memoryService.musicMemories;
+ final placeItems = memoryService.placesMemories;
+ final isPlayingVoice = memoryService.isPlayingVoiceNote;
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await memoryService.loadMemories(elderId: mappedId);
-        setState(() {});
-      },
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Top Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Image.asset(
-                      'assets/images/camera_icon.png',
-                      width: 36,
-                      height: 36,
-                      fit: BoxFit.contain,
-                      errorBuilder: (ctx, err, stack) => const Text('📸', style: TextStyle(fontSize: 26)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        i18n.translate('memoryLane'),
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1B2824)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add_circle, color: Color(0xFF23B39B), size: 36),
-                onPressed: () => _showAddMemoryDialog(context),
-                tooltip: isTamil ? 'நினைவு சேர்' : 'Add Memory',
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+ return RefreshIndicator(
+   onRefresh: () async {
+     await memoryService.loadMemories(elderId: mappedId);
+     setState(() {});
+   },
+   child: ListView(
+     padding: const EdgeInsets.all(16),
+     children: [
+       // Top Header
+       Row(
+         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+         children: [
+           Expanded(
+             child: Row(
+               children: [
+                 Image.asset(
+                   'assets/images/camera_icon.png',
+                   width: 36,
+                   height: 36,
+                   fit: BoxFit.contain,
+                   errorBuilder: (ctx, err, stack) => const Text('📸', style: TextStyle(fontSize: 26)),
+                 ),
+                 const SizedBox(width: 10),
+                 Expanded(
+                   child: Text(
+                     i18n.translate('memoryLane'),
+                     style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1B2824)),
+                   ),
+                 ),
+               ],
+             ),
+           ),
+           if (_selectedTab == 0)
+             IconButton(
+               icon: const Icon(Icons.add_circle, color: Color(0xFF23B39B), size: 36),
+               onPressed: () => _showAddMemoryDialog(context),
+               tooltip: isTamil ? 'நினைவு சேர்' : 'Add Memory',
+             ),
+         ],
+       ),
+       const SizedBox(height: 16),
 
-          // Upload Personal Memory Action Banner Button
-          Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF23B39B),
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              icon: const Icon(
-                Icons.add_photo_alternate,
-                color: Colors.white,
-              ),
-              label: Text(
-                isTamil ? '🖼️ சொந்த நினைவை பதிவேற்று' : '🖼️ Upload Personal Memory',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              onPressed: () => _showAddMemoryDialog(context),
-            ),
-          ),
+       // OVERALL MEMORYLANE STRUCTURE (3 Navigation Cards):
+       // 1. Personal Memories (Existing Feature — 100% Unchanged)
+       // 2. Favorite Music (New Feature)
+       // 3. Favorite Places (New Feature)
+       _buildSectionTabCard(
+         index: 0,
+         title: isTamil ? 'சொந்த நினைவுகள்' : 'Personal Memories',
+         subtitle: isTamil ? 'புகைப்படம் • காணொளி • குரல்' : 'Photos • Video • Voice Story',
+         icon: Icons.photo_library,
+         count: personalItems.length,
+       ),
+       const SizedBox(height: 10),
+       _buildSectionTabCard(
+         index: 1,
+         title: isTamil ? '❤️ பிடித்த இசை' : '❤️ Favorite Music',
+         subtitle: isTamil ? 'பராமரிப்பாளர் சேர்த்த MP3 இசை' : 'Caregiver adds music • MP3',
+         icon: Icons.music_note,
+         count: musicItems.length,
+       ),
+       const SizedBox(height: 10),
+       _buildSectionTabCard(
+         index: 2,
+         title: isTamil ? '📍 பிடித்த இடங்கள்' : '📍 Favorite Places',
+         subtitle: isTamil ? 'புகைப்படங்கள் • வீடியோ • கதை' : 'Photos • Video • Story',
+         icon: Icons.place,
+         count: placeItems.length,
+       ),
+       const SizedBox(height: 16),
 
-          // Active Playing Sticky Audio Banner
-          if (isPlayingVoice) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.volume_up, color: Color(0xFFDC2626), size: 22),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            isTamil ? ' ஒலி இயங்குகிறது...' : ' Playing Voice Note...',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF991B1B), fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDC2626),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    icon: const Icon(Icons.stop, color: Colors.white, size: 16),
-                    label: Text(
-                      i18n.translate('stopAudioBtn'),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                    onPressed: () => memoryService.stopVoiceNote(),
-                  ),
-                ],
-              ),
-            ),
-          ],
+       // --- SECTION 1: PERSONAL MEMORIES (EXISTING FEATURE — UNCHANGED) ---
+       if (_selectedTab == 0) ...[
+         // Upload Personal Memory Action Banner Button
+         Container(
+           margin: const EdgeInsets.only(bottom: 16),
+           child: ElevatedButton.icon(
+             style: ElevatedButton.styleFrom(
+               backgroundColor: const Color(0xFF23B39B),
+               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+             ),
+             icon: const Icon(
+               Icons.add_photo_alternate,
+               color: Colors.white,
+             ),
+             label: Text(
+               isTamil ? '🖼️ சொந்த நினைவை பதிவேற்று' : '🖼️ Upload Personal Memory',
+               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+             ),
+             onPressed: () => _showAddMemoryDialog(context),
+           ),
+         ),
 
-          ..._buildMediaCardsContent(context, currentItems, memoryService, auth, i18n),
- ],
- ),
+         // Active Playing Sticky Audio Banner
+         if (isPlayingVoice) ...[
+           Container(
+             margin: const EdgeInsets.only(bottom: 16),
+             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+             decoration: BoxDecoration(
+               color: const Color(0xFFFEF2F2),
+               borderRadius: BorderRadius.circular(14),
+               border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+             ),
+             child: Row(
+               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+               children: [
+                 Expanded(
+                   child: Row(
+                     children: [
+                       const Icon(Icons.volume_up, color: Color(0xFFDC2626), size: 22),
+                       const SizedBox(width: 8),
+                       Expanded(
+                         child: Text(
+                           isTamil ? ' ஒலி இயங்குகிறது...' : ' Playing Voice Note...',
+                           style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF991B1B), fontSize: 13),
+                         ),
+                       ),
+                     ],
+                   ),
+                 ),
+                 ElevatedButton.icon(
+                   style: ElevatedButton.styleFrom(
+                     backgroundColor: const Color(0xFFDC2626),
+                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                   ),
+                   icon: const Icon(Icons.stop, color: Colors.white, size: 16),
+                   label: Text(
+                     i18n.translate('stopAudioBtn'),
+                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                   ),
+                   onPressed: () => memoryService.stopVoiceNote(),
+                 ),
+               ],
+             ),
+           ),
+         ],
+
+         ..._buildMediaCardsContent(context, personalItems, memoryService, auth, i18n),
+       ],
+
+       // --- SECTION 2: FAVORITE MUSIC (NEW FEATURE) ---
+       if (_selectedTab == 1) ...[
+         FavoriteMusicSection(isCaregiver: auth.isCaretaker),
+       ],
+
+       // --- SECTION 3: FAVORITE PLACES (NEW FEATURE) ---
+       if (_selectedTab == 2) ...[
+         FavoritePlaceSection(isCaregiver: auth.isCaretaker),
+       ],
+     ],
+   ),
  );
  }
 

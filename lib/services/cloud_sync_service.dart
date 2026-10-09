@@ -547,8 +547,32 @@ class CloudSyncService extends ChangeNotifier {
  }
  }
 
- // 2. Custom Photo File Base64
- if (m.imagePath.isNotEmpty && (m.imagePath.startsWith('/') || m.imagePath.contains('file://') || m.imagePath.contains('data/'))) {
+ // 2. Custom Photo File Base64 (single and multiple photos)
+ if (m.photos.isNotEmpty) {
+   final List<String> pBase64List = [];
+   for (final p in m.photos) {
+     if (p.startsWith('/') || p.contains('file://') || p.contains('data/')) {
+       final cleanP = p.replaceAll('file://', '');
+       final f = File(cleanP);
+       if (f.existsSync() && f.lengthSync() > 0 && f.lengthSync() < 25 * 1024 * 1024) {
+         try {
+           final b = await f.readAsBytes();
+           pBase64List.add(base64Encode(b));
+         } catch (e) {
+           debugPrint('Error reading photo in photos list: $e');
+         }
+       }
+     }
+   }
+   if (pBase64List.isNotEmpty) {
+     map['photosBase64'] = pBase64List;
+     if (!map.containsKey('imageBase64')) {
+       map['imageBase64'] = pBase64List.first;
+     }
+   }
+ }
+
+ if (!map.containsKey('imageBase64') && m.imagePath.isNotEmpty && (m.imagePath.startsWith('/') || m.imagePath.contains('file://') || m.imagePath.contains('data/'))) {
  final cleanPath = m.imagePath.replaceAll('file://','');
  final file = File(cleanPath);
  if (file.existsSync() && file.lengthSync() > 0) {
